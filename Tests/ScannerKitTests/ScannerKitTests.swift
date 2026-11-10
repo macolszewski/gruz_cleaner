@@ -37,6 +37,9 @@ struct Fixture {
         #expect(CommandPolicy.isAllowedCleanCommand(["uv", "cache", "clean", "--cache-dir", "/Users/me/.cache/uv"]))
         // Without the folder, uv would clean whatever cache its configuration points to.
         #expect(!CommandPolicy.isAllowedCleanCommand(["uv", "cache", "clean"]))
+        #expect(CommandPolicy.isAllowedCleanCommand(["go", "clean", "-modcache"]))
+        #expect(CommandPolicy.isAllowedCheckCommand(["go", "env", "GOMODCACHE"]))
+        #expect(!CommandPolicy.isAllowedCleanCommand(["go", "clean", "-cache", "-modcache"]))
     }
 
     @Test func gitInspectionDisablesConfiguredPrograms() {
@@ -418,6 +421,70 @@ struct Fixture {
         #expect(paths.contains(fx.path("ws/android/build")))
         #expect(!paths.contains(fx.path("ws/cpp/build")))
     }
+
+    @Test func testResultsNeedTheirTestRunner() throws {
+        let fx = try Fixture()
+        try fx.file("ws/web/playwright.config.ts")
+        try fx.file("ws/web/test-results/login-chromium/trace.zip")
+        try fx.file("ws/web/playwright-report/index.html")
+        // Same names without a Playwright configuration: the user's own data.
+        try fx.file("ws/lab/package.json")
+        try fx.file("ws/lab/test-results/summary.csv")
+        try fx.file("ws/shop/cypress.config.ts")
+        try fx.file("ws/shop/cypress/videos/cart.cy.ts.mp4")
+        try fx.file("ws/shop/cypress/e2e/cart.cy.ts")
+        try fx.file("ws/shop/cypress/fixtures/user.json")
+        try fx.file("ws/old/cypress/screenshots/a.png")
+        try fx.file("ws/photos/screenshots/a.png")
+        try fx.file("ws/api/Api.csproj")
+        try fx.file("ws/api/TestResults/run.trx")
+
+        let catalog = try RuleCatalog.builtIn()
+        let found = ProjectSource.findArtifacts(in: fx.path("ws"), definitions: catalog.artifacts, home: "/nonexistent")
+        let ids = Dictionary(found.map { ($0.path, $0.definition.id) }, uniquingKeysWith: { a, _ in a })
+        #expect(ids[fx.path("ws/web/test-results")] == "artifact.playwright-results")
+        #expect(ids[fx.path("ws/web/playwright-report")] == "artifact.playwright-results")
+        #expect(ids[fx.path("ws/lab/test-results")] == nil)
+        #expect(ids[fx.path("ws/shop/cypress/videos")] == "artifact.cypress-results")
+        #expect(!ids.keys.contains { $0.hasPrefix(fx.path("ws/shop/cypress/e2e")) || $0.hasPrefix(fx.path("ws/shop/cypress/fixtures")) })
+        #expect(ids[fx.path("ws/old/cypress/screenshots")] == nil)
+        #expect(ids[fx.path("ws/photos/screenshots")] == nil)
+        #expect(ids[fx.path("ws/api/TestResults")] == "artifact.dotnet-testresults")
+    }
+
+    @Test func workspaceCachesNeedTheWorkspaceFile() throws {
+        let fx = try Fixture()
+        try fx.file("ws/mono/nx.json")
+        try fx.file("ws/mono/.nx/cache/123/outputs.txt")
+        try fx.file("ws/mono/.nx/workspace-data/project-graph.json")
+        try fx.file("ws/other/.nx/cache/1/a")
+        try fx.file("ws/py/noxfile.py")
+        try fx.file("ws/py/.nox/tests-3-13/pyvenv.cfg")
+        try fx.file("ws/sln/Directory.Build.props", contents: "<Project><PropertyGroup><UseArtifactsOutput>true</UseArtifactsOutput></PropertyGroup></Project>")
+        try fx.file("ws/sln/artifacts/bin/App/debug/App.dll")
+        try fx.file("ws/sln/artifacts/obj/App/debug/App.pdb")
+        try fx.file("ws/sln/artifacts/publish/App/release/App.dll")
+        try fx.file("ws/sln/artifacts/package/release/App.1.0.0.nupkg")
+        // Directory.Build.props without the artifacts layout.
+        try fx.file("ws/plain/Directory.Build.props", contents: "<Project></Project>")
+        try fx.file("ws/plain/artifacts/bin/tool")
+
+        let catalog = try RuleCatalog.builtIn()
+        let found = ProjectSource.findArtifacts(in: fx.path("ws"), definitions: catalog.artifacts, home: "/nonexistent")
+        let ids = Dictionary(found.map { ($0.path, $0.definition.id) }, uniquingKeysWith: { a, _ in a })
+        #expect(ids[fx.path("ws/mono/.nx/cache")] == "artifact.nx-cache")
+        #expect(!ids.keys.contains { $0.contains("workspace-data") })
+        #expect(ids[fx.path("ws/other/.nx/cache")] == nil)
+        #expect(ids[fx.path("ws/py/.nox")] == "artifact.nox")
+        #expect(ids[fx.path("ws/sln/artifacts/bin")] == "artifact.dotnet-artifacts")
+        #expect(ids[fx.path("ws/sln/artifacts/obj")] == "artifact.dotnet-artifacts")
+        #expect(!ids.keys.contains { $0.contains("publish") || $0.contains("package") })
+        #expect(ids[fx.path("ws/plain/artifacts/bin")] == nil)
+
+        let definition = try #require(catalog.artifacts.first { $0.id == "artifact.nx-cache" })
+        let item = ProjectSource.makeItem(definition, path: fx.path("ws/mono/.nx/cache"), root: fx.path("ws"), info: SizeInfo(allocatedBytes: 1), note: nil)
+        #expect(item.title == "ws/mono/.nx/cache")
+    }
 }
 
 @Suite struct ClaimRegistryTests {
@@ -446,6 +513,31 @@ struct Fixture {
         ))
         #expect(item.action == .command(argv: ["uv", "cache", "clean", "--cache-dir", "/Users/me/.cache/uv"]))
         #expect(item.paths == ["/Users/me/.cache/uv"])
+    }
+
+    @Test func goModulesAreRemovedOnlyFromTheScannedFolder() throws {
+        let catalog = try RuleCatalog.builtIn()
+        let rule = try #require(catalog.rules.first { $0.id == "go.modcache" })
+        let path = "/Users/me/go/pkg/mod"
+        let item = try #require(RuleSource.makeItem(rule: rule, paths: [path], sizes: [path: SizeInfo(allocatedBytes: 1)], home: "/Users/me"))
+        #expect(item.action == .command(argv: ["go", "clean", "-modcache"]))
+        #expect(item.preconditions == [CommandCheck(argv: ["go", "env", "GOMODCACHE"], expected: path, purpose: .toolLocation)])
+    }
+
+    @Test func agentWorktreesMustBeGitCheckouts() throws {
+        let fx = try Fixture()
+        try fx.file("home/.codex/worktrees/a1b2/shop/.git", contents: "gitdir: /Users/me/code/shop/.git/worktrees/shop")
+        try fx.file("home/.codex/worktrees/a1b2/shop/src/main.ts")
+        try fx.file("home/.codex/worktrees/a1b2/notes/todo.md")
+        try fx.file("home/.cursor/worktrees/api/feature/.git", contents: "gitdir: x")
+        let catalog = try RuleCatalog.builtIn()
+        let codex = try #require(catalog.rules.first { $0.id == "codex.worktrees" })
+        let cursor = try #require(catalog.rules.first { $0.id == "cursor.worktrees" })
+        #expect(RuleSource.matches(for: codex, home: fx.path("home")) == [fx.path("home/.codex/worktrees/a1b2/shop")])
+        #expect(RuleSource.matches(for: cursor, home: fx.path("home")) == [fx.path("home/.cursor/worktrees/api/feature")])
+        // They come before the informational rule that covers the rest of ~/.codex.
+        let ids = catalog.rules.map(\.id)
+        #expect(try #require(ids.firstIndex(of: "codex.worktrees")) < #require(ids.firstIndex(of: "codex.data")))
     }
 
     @Test func jetBrainsRuleNeverCoversLocalHistory() throws {

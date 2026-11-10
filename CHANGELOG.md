@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Test results: Playwright (`test-results`, `playwright-report`, `blob-report` next to a Playwright
+  configuration), Cypress (`screenshots`, `videos`, `downloads` in a project with a Cypress
+  configuration) and .NET `TestResults`. They are **Caution**, since an old trace may be the only
+  record of a failure.
+- The Go module cache, cleared with `go clean -modcache` only while `go env GOMODCACHE` still names
+  the scanned folder.
+- Git dependencies of Cargo (`~/.cargo/git`) and Dart pub (`~/.pub-cache/git`), as **Caution**.
+- Nx task cache (`.nx/cache` next to `nx.json`), Nox environments (`.nox`) and the .NET central
+  `artifacts/bin` and `artifacts/obj` (`UseArtifactsOutput`), never `artifacts/publish` or `package`.
+- Codex and Cursor worktrees outside project folders, each with its Git status.
+- Archived Codex sessions, the Hugging Face Datasets cache and Whisper models.
+- Rules can bind a command to the scanned folder with `preconditions`; artifact definitions can
+  require a file next to the parent folder (`parentSiblingsAny`, `parentSiblingContainsAny`).
+
+### Changed
+
+- Project items from definitions with several folder names now show the folder (`app/bin`, `app/obj`)
+  instead of the same project name twice.
+
 ## [1.0.1]
 
 Fixes from an external technical audit of 1.0.0. The theme: what the review sheet shows must be

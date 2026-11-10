@@ -298,6 +298,21 @@
     }
   },
   {
+    "id": "pub.git",
+    "category": "packages",
+    "app": "Dart / Flutter",
+    "title": "Dart Git dependencies (pub)",
+    "description": "Repositories and checkouts of Dart packages that projects take straight from Git. Globally activated tools that use them need dart pub get or a new activation afterwards.",
+    "regeneration": "flutter pub get clones the repositories again.",
+    "safety": "caution",
+    "paths": [
+      "~/.pub-cache/git"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
     "id": "dart.analysis",
     "category": "packages",
     "app": "Dart",
@@ -403,6 +418,38 @@
     }
   },
   {
+    "id": "go.modcache",
+    "category": "packages",
+    "app": "Go",
+    "title": "Go module cache",
+    "description": "Source code of Go modules downloaded for your projects (GOMODCACHE). Go marks these files read-only, so GRUZ removes them with Go's own command.",
+    "regeneration": "go build or go mod download downloads the modules again.",
+    "safety": "regenerable",
+    "paths": [
+      "~/go/pkg/mod"
+    ],
+    "action": {
+      "type": "command",
+      "argv": [
+        "go",
+        "clean",
+        "-modcache"
+      ]
+    },
+    "preconditions": [
+      {
+        "argv": [
+          "go",
+          "env",
+          "GOMODCACHE"
+        ],
+        "expected": "{path}",
+        "purpose": "toolLocation"
+      }
+    ],
+    "note": "Runs go clean -modcache after checking that Go still uses this folder."
+  },
+  {
     "id": "cargo.registry",
     "category": "packages",
     "app": "Rust / Cargo",
@@ -413,6 +460,23 @@
     "paths": [
       "~/.cargo/registry"
     ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "cargo.git",
+    "category": "packages",
+    "app": "Rust / Cargo",
+    "title": "Cargo Git dependencies",
+    "description": "Repositories and checkouts of crates that projects take straight from Git. A private repository can only be downloaded again with access to it.",
+    "regeneration": "cargo build clones the repositories again.",
+    "safety": "caution",
+    "paths": [
+      "~/.cargo/git/db",
+      "~/.cargo/git/checkouts"
+    ],
+    "group": true,
     "action": {
       "type": "trash"
     }

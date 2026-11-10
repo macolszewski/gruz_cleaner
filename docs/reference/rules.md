@@ -65,6 +65,8 @@ Put specific rules in lower-numbered files and broad patterns (such as `~/Librar
 | `group` | no | `false` | Show matches as a group with one child per path, even when only one path matches. |
 | `versionPattern` | for `versions` | none | Regular expression for `kind: versions`. |
 | `note` | no | none | Extra remark shown in the details panel. |
+| `preconditions` | no | `[]` | Read-only checks repeated right before removal, see [Preconditions](#preconditions). |
+| `gitStatusCheck` | no | `false` | Keep only matches that are Git checkouts (have a `.git` entry) and show their `git status` in the note. Used for agent worktrees outside project folders (`codex.worktrees`, `cursor.worktrees`). |
 
 ### Paths
 
@@ -142,6 +144,24 @@ Prefer `trash`. The user can still switch a Trash item to "Skip Trash" in the re
 
 Permanent actions are marked on the item and confirmed by an extra alert before they run.
 
+### Preconditions
+
+A command that does not take the folder as an argument must still act on the folder that was measured.
+`preconditions` binds it: each check runs an allow-listed read-only command before the removal, and the
+operation is skipped when no output line equals `expected`. `{path}` in `argv` or `expected` is replaced
+by the matched path.
+
+```json
+"action": { "type": "command", "argv": ["go", "clean", "-modcache"] },
+"preconditions": [
+  { "argv": ["go", "env", "GOMODCACHE"], "expected": "{path}", "purpose": "toolLocation" }
+]
+```
+
+`purpose` selects the message shown when the check fails: `toolLocation` (the tool now uses another
+folder), `dockerEngine` or `dockerImage` (used by the Docker source). Check commands are listed in
+`CommandPolicy.checkPatterns`; validation rejects any other.
+
 ## Owner apps
 
 Set `requiresAppClosed: true` with `ownerBundleIDs` when the app keeps files open or would rewrite a half-removed cache, typical for Electron apps, IDEs, browsers and Xcode. Removal is blocked while any listed app is running, and the review sheet names the app to quit. Find a bundle identifier with:
@@ -164,7 +184,9 @@ mdls -name kMDItemCFBundleIdentifier -r /Applications/Example.app
 - a rule has no `paths`;
 - a `userData` rule has an `action`;
 - a `versions` rule has no `versionPattern`;
-- a `command` action does not match `CommandPolicy`.
+- a `command` action does not match `CommandPolicy`;
+- a precondition command is not an allow-listed check;
+- an artifact sets `parentSiblingContainsAny` without `parentSiblingsAny`.
 
 Unknown `category`, `safety`, `kind`, `childTitle` or action `type` values fail decoding. The test suite adds:
 
@@ -195,7 +217,9 @@ Artifacts are folders inside the user's project folders that a build or install 
 | `siblingsAny` | no | `[]` | At least one entry next to the folder must match one of these globs. |
 | `insideAny` | no | `[]` | At least one entry inside the folder must match one of these globs. |
 | `insideNone` | no | `[]` | No entry inside the folder may match one of these globs (source files that show it is not output). |
-| `parentName` | no | none | Required name of the parent folder. |
+| `parentName` | no | none | Required name of the parent folder. A hidden parent name (`.nx`, `.claude`) also makes the walk enter such folders. |
+| `parentSiblingsAny` | no | `[]` | At least one entry next to the parent folder must match one of these globs (`nx.json` next to `.nx`). |
+| `parentSiblingContainsAny` | no | `[]` | One of the files matched by `parentSiblingsAny` must contain one of these strings (read up to 1 MB). `artifact.dotnet-artifacts` requires `UseArtifactsOutput` or `ArtifactsPath` in `Directory.Build.props`. |
 | `title` | yes | | Group title in the Projects category. |
 | `description` | yes | | What the folder contains. |
 | `regeneration` | no | none | How to recreate it. |
@@ -204,7 +228,9 @@ Artifacts are folders inside the user's project folders that a build or install 
 | `childrenAreItems` | no | `false` | The found folder is a container; each subfolder becomes an item (agent worktrees). |
 | `gitStatusCheck` | no | `false` | Run `git status --porcelain` on each item and show the result in its note. |
 
-The context conditions are what make a name match trustworthy. `bin` is a .NET build folder only next to a project file; elsewhere it may hold scripts. `build` is build output next to `pubspec.yaml`, `build.gradle` or `CMakeLists.txt`, but may be source code elsewhere, and even next to `pyproject.toml` it may be a Python package named `build`; that is why `artifact.flutter-build` also requires generated files inside (`insideAny`) and no source files (`insideNone`). Always add a sibling or inside condition unless the name is unambiguous (`__pycache__`, `.mypy_cache`).
+The context conditions are what make a name match trustworthy. `bin` is a .NET build folder only next to a project file; elsewhere it may hold scripts. `build` is build output next to `pubspec.yaml`, `build.gradle` or `CMakeLists.txt`, but may be source code elsewhere, and even next to `pyproject.toml` it may be a Python package named `build`; that is why `artifact.flutter-build` also requires generated files inside (`insideAny`) and no source files (`insideNone`). Always add a sibling or inside condition unless the name is unambiguous (`__pycache__`, `.mypy_cache`). Generic names need the tool's own file as context: `test-results` counts only next to a `playwright.config.*`, and `cypress/videos` only when the project has a `cypress.config.*`.
+
+Never derive a location by running project code. GRUZ does not execute JavaScript configs, `noxfile.py` or MSBuild to learn where output goes; it reads plain files and recognizes the default layout.
 
 A typical location or folder name is not proof that everything in it can be recreated. Before marking a rule `safe` or `regenerable`, check what else the tool keeps there: JetBrains stores Local History in its cache folder, Maven keeps locally installed artifacts next to downloaded ones, and Hugging Face keeps the login token next to its model cache. Point the rule at the disposable subfolders, lower the safety level, or protect the rest in `Denylist`.
 

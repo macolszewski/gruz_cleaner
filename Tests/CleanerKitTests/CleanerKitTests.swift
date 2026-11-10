@@ -194,6 +194,28 @@ struct TestEnvironment {
         #expect(h.commands.calls.last == ["/fake/bin/docker", "volume", "rm", "shop_db"])
     }
 
+    @Test func goModulesAreKeptWhenGoUsesAnotherFolder() async throws {
+        let h = try TestEnvironment()
+        let mod = try h.make("go/pkg/mod")
+        var item = h.item("go", paths: [mod], action: .command(argv: ["go", "clean", "-modcache"]))
+        item.preconditions = [CommandCheck(argv: ["go", "env", "GOMODCACHE"], expected: mod, purpose: .toolLocation)]
+        let plan = CleaningPlan.make(from: [item])
+        let confirmation = CleaningConfirmation(planID: plan.id, permanentConfirmed: true)
+
+        h.commands.outputs["env GOMODCACHE"] = "/Volumes/Data/gomod\n"
+        let refused = await h.executor().execute(plan, confirmation: confirmation)
+        guard case .skipped = refused.results.first?.status else {
+            Issue.record("expected a skip")
+            return
+        }
+        #expect(!h.commands.calls.contains { $0.contains("clean") })
+
+        h.commands.outputs["env GOMODCACHE"] = mod + "\n"
+        let report = await h.executor().execute(plan, confirmation: confirmation)
+        #expect(report.doneCount == 1)
+        #expect(h.commands.calls.last == ["/fake/bin/go", "clean", "-modcache"])
+    }
+
     @Test func oneEngineCheckServesTheWholePlan() async throws {
         let h = try TestEnvironment()
         let info = ["docker", "info", "--format", "{{.ID}} {{.Name}}"]

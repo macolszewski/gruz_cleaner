@@ -63,7 +63,9 @@ enum ProjectSource {
     static func makeItem(_ definition: ArtifactDefinition, path: String, root: String, info: SizeInfo, note: String?) -> ScanItem {
         let rootName = (root as NSString).lastPathComponent
         let relative = path.hasPrefix(root + "/") ? String(path.dropFirst(root.count + 1)) : path
-        let title = definition.childrenAreItems
+        // A project can hold several folders of one definition (bin and obj, test-results and playwright-report),
+        // so those are named in full; single-name folders by their project.
+        let title = definition.childrenAreItems || definition.parentName != nil || definition.dirNames.count > 1
             ? "\(rootName)/\(relative)"
             : "\(rootName)/\((relative as NSString).deletingLastPathComponent)"
         return ScanItem(
@@ -89,7 +91,8 @@ enum ProjectSource {
     static func findArtifacts(in root: String, definitions: [ArtifactDefinition], home: String) -> [Found] {
         var byName: [String: [ArtifactDefinition]] = [:]
         for d in definitions { for n in d.dirNames { byName[n, default: []].append(d) } }
-        let hiddenAllowed = Set(byName.keys.filter { $0.hasPrefix(".") }).union([".claude"])
+        let hiddenParents = definitions.compactMap(\.parentName).filter { $0.hasPrefix(".") }
+        let hiddenAllowed = Set(byName.keys.filter { $0.hasPrefix(".") }).union(hiddenParents)
 
         var results: [Found] = []
         let cRoot = strdup(root)
@@ -126,6 +129,15 @@ enum ProjectSource {
 
     static func matches(_ d: ArtifactDefinition, path: String, parent: String) -> Bool {
         if let parentName = d.parentName, (parent as NSString).lastPathComponent != parentName { return false }
+        if !d.parentSiblingsAny.isEmpty {
+            let workspace = (parent as NSString).deletingLastPathComponent
+            let names = ((try? FileManager.default.contentsOfDirectory(atPath: workspace)) ?? [])
+                .filter { s in d.parentSiblingsAny.contains { Paths.fnmatch($0, s) } }
+            guard !names.isEmpty else { return false }
+            if !d.parentSiblingContainsAny.isEmpty, !names.contains(where: { fileContains(Paths.join(workspace, $0), any: d.parentSiblingContainsAny) }) {
+                return false
+            }
+        }
         if !d.siblingsAny.isEmpty {
             let siblings = (try? FileManager.default.contentsOfDirectory(atPath: parent)) ?? []
             guard siblings.contains(where: { s in d.siblingsAny.contains { Paths.fnmatch($0, s) } }) else { return false }
@@ -136,6 +148,15 @@ enum ProjectSource {
             if inside.contains(where: { s in d.insideNone.contains { Paths.fnmatch($0, s) } }) { return false }
         }
         return true
+    }
+
+    /// Reads at most 1 MB: project files that declare build settings are small.
+    static func fileContains(_ path: String, any needles: [String]) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: 1 << 20) else { return false }
+        let text = String(decoding: data, as: UTF8.self)
+        return needles.contains { text.contains($0) }
     }
 
     static func gitStatusNote(_ path: String) async -> String? {

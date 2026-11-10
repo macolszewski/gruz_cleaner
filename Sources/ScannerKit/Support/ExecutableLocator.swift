@@ -7,7 +7,7 @@ public enum ExecutableLocator {
         var dirs = [
             "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin",
             "\(h)/.orbstack/bin", "/Applications/OrbStack.app/Contents/MacOS/xbin",
-            "\(h)/.local/bin", "\(h)/.cargo/bin", "\(h)/.dotnet", "/usr/local/share/dotnet",
+            "\(h)/.local/bin", "\(h)/.cargo/bin", "\(h)/.dotnet", "/usr/local/share/dotnet", "/usr/local/go/bin",
         ]
         // nvm installs npm per Node version; prefer the newest.
         let nvm = "\(h)/.nvm/versions/node"

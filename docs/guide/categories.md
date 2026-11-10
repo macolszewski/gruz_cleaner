@@ -49,13 +49,16 @@ after the commands finish.
 ### Package managers
 
 Caches and downloads of package managers and toolchains: npm (and `npx` packages older than 30 days),
-pnpm, Yarn, Bun, uv, pip, the system Python cache, Homebrew, CocoaPods, Swift Package Manager, Go,
-Gradle, Maven, NuGet, Dart pub, the Cargo registry, Playwright and Puppeteer browsers, and old
-versions kept by nvm and FVM.
+pnpm, Yarn, Bun, uv, pip, the system Python cache, Homebrew, CocoaPods, Swift Package Manager, Go
+(build cache and module cache), Gradle, Maven, NuGet, Dart pub, the Cargo registry, Playwright and
+Puppeteer browsers, and old versions kept by nvm and FVM.
 
 Most are **Safe** or **Regenerable** and move to the Trash. The uv cache is cleared with
 `uv cache clean --cache-dir <the measured folder>` instead, because uv keeps its cache consistent that
-way; the command is permanent. The local Maven repository is **Caution**: next to downloaded libraries
+way; the command is permanent. The Go module cache is cleared with `go clean -modcache`, because Go
+marks module files read-only; it runs only while `go env GOMODCACHE` still names the measured folder.
+Dependencies that Cargo and Dart pub take straight from Git (`~/.cargo/git`, `~/.pub-cache/git`) are
+**Caution**: a private repository can only be downloaded again with access to it. The local Maven repository is **Caution**: next to downloaded libraries
 it holds artifacts installed with `mvn install`, which may exist nowhere else. Tools and
 Python versions installed by uv are **Caution**. The currently installed Node.js (nvm) and a locally
 installed .NET SDK are shown as **User data**.
@@ -84,11 +87,20 @@ folder name alone is not enough: GRUZ checks what is next to it or inside it.
 | `Pods` | next to `Podfile` |
 | `dist`, `.next`, `.nuxt`, `.turbo`, `.parcel-cache`, `.svelte-kit`, `.angular`, `.vite`, `coverage` | next to `package.json` |
 | `target` (Maven) | next to `pom.xml` |
+| `artifacts/bin`, `artifacts/obj` (.NET central output) | `Directory.Build.props` next to `artifacts` sets `UseArtifactsOutput` or `ArtifactsPath`; `artifacts/publish` and `artifacts/package` are never offered |
+| `.nx/cache` (Nx task cache) | `nx.json` next to `.nx`; the rest of `.nx` is not offered |
+| `.nox` | next to `noxfile.py` |
+| `test-results`, `playwright-report`, `blob-report` | next to a `playwright.config.*` (**Caution**) |
+| `cypress/screenshots`, `cypress/videos`, `cypress/downloads` | the project has a `cypress.config.*` (**Caution**) |
+| `TestResults` (.NET tests) | next to a .NET project or solution file (**Caution**) |
 | `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.tox`, `.hypothesis` | anywhere (**Safe**) |
 | Claude Code agent worktrees | each folder in `.claude/worktrees` (**Caution**) |
 
-Most project items are **Regenerable** and move to the Trash. Agent worktrees are **Caution**,
-because a worktree may hold uncommitted work: the item note shows a `git status` summary. The project
+Most project items are **Regenerable** and move to the Trash. Test results are **Caution**: running
+the tests again does not bring back the trace or video of an earlier failure. Agent worktrees are
+**Caution**, because a worktree may hold uncommitted work: the item note shows a `git status` summary.
+Worktrees that Codex (`~/.codex/worktrees`) and Cursor (`~/.cursor/worktrees`) keep outside your
+project folders are listed here too, each with its Git status. The project
 folders themselves and your source code are protected and can never be removed. Rust `target`
 folders are listed in Rust and Cargo instead.
 
@@ -114,12 +126,15 @@ and the Android tools cache.
 
 ### AI tools
 
-- Model caches: Hugging Face, PyTorch, LM Studio and Ollama models (**Regenerable**, a large
+- Model caches: Hugging Face, PyTorch, Whisper, LM Studio and Ollama models (**Regenerable**, a large
   download to get back). For Hugging Face only the model stores are offered; the login token next to
   them is kept.
+- The Hugging Face Datasets cache, one item per dataset (**Caution**: processed variants may need your
+  scripts and computing time to recreate).
 - Claude Code: old versions, temporary files, session transcripts and file history. Sessions and file
   history are **Caution** and are shown only when older than 30 days by default.
-- Codex: sessions (older than 30 days by default), temporary files, logs, runtimes and the app cache.
+- Codex: sessions and archived sessions (older than 30 days by default), temporary files, logs,
+  runtimes and the app cache.
 - Claude Desktop: its cache, the bundled Claude Code and its virtual machine (**Caution**).
 - LM Studio runtimes, superwhisper recordings (older than 30 days by default), claude-mem logs.
 

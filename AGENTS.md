@@ -39,9 +39,10 @@ swift run gruz-scan [--children] [--json] [--root <folder>]
 - The hard-coded denylist (home root, `~/Documents`, `~/Desktop`, `.git` folders, `/System`, project roots, ...) wins over any rule.
 - Every `command` action must pass `CommandPolicy`; tests check that removable rule paths pass the denylist.
 - Docker and OrbStack data is cleaned only through the `docker` CLI. Named volumes hold databases and are always `caution`.
-- What the user reviewed must be what gets removed. Docker commands carry `CommandCheck`s (engine identity, image id behind a tag) that the executor repeats before running; commands acting on a folder take it as an explicit argument (`{path}` in rule `argv`).
+- What the user reviewed must be what gets removed. Docker commands carry `CommandCheck`s (engine identity, image id behind a tag) that the executor repeats before running; commands acting on a folder take it as an explicit argument (`{path}` in rule `argv`) or carry a `preconditions` check that the tool still uses that folder (`go env GOMODCACHE`).
 - `safe`/`regenerable` means everything under the rule's paths comes back. When a tool keeps irreplaceable data in its cache folder (JetBrains Local History, the Hugging Face token), target the disposable subfolders and add the rest to `Denylist.preservedPatterns`.
 - Results are honest: a partly done operation is `.partial`, never `.done`; unreadable contents mark an item `isPartiallyMeasured`; an unknown answer (Spotlight error) is never treated as "not installed".
+- Never run project code (JS configs, `noxfile.py`, MSBuild) to learn a location; recognize the default layout and read plain files. Generic folder names need the tool's own file as context (`test-results` only next to `playwright.config.*`).
 - New locations: add a rule to the right `rules-NN-*.json` (file order is priority on overlapping paths) plus its translation in `Rules/Localizations/pl.json`. See [docs/reference/rules.md](docs/reference/rules.md).
 
 ## Language

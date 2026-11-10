@@ -491,5 +491,74 @@
     "title": "Wyniki kompilacji Maven",
     "description": "Skompilowane pliki projektu Maven.",
     "regeneration": "mvn package."
+  },
+  "go.modcache": {
+    "title": "Cache modułów Go",
+    "description": "Kod źródłowy modułów Go pobranych dla Twoich projektów (GOMODCACHE). Go oznacza te pliki jako tylko do odczytu, więc GRUZ usuwa je poleceniem samego Go.",
+    "regeneration": "go build lub go mod download pobierze moduły ponownie.",
+    "note": "Uruchamia go clean -modcache po sprawdzeniu, że Go nadal używa tego folderu."
+  },
+  "cargo.git": {
+    "title": "Zależności Git w Cargo",
+    "description": "Repozytoria i checkouty crate'ów, które projekty pobierają bezpośrednio z Gita. Prywatne repozytorium da się pobrać ponownie tylko z dostępem do niego.",
+    "regeneration": "cargo build sklonuje repozytoria ponownie."
+  },
+  "pub.git": {
+    "title": "Zależności Git w Dart (pub)",
+    "description": "Repozytoria i checkouty pakietów Dart, które projekty pobierają bezpośrednio z Gita. Globalnie aktywowane narzędzia, które z nich korzystają, będą potem wymagały dart pub get albo ponownej aktywacji.",
+    "regeneration": "flutter pub get sklonuje repozytoria ponownie."
+  },
+  "codex.archived-sessions": {
+    "title": "Zarchiwizowane sesje Codex",
+    "description": "Zapisy rozmów z Codex, które zostały zarchiwizowane.",
+    "regeneration": "Nie da się ich odtworzyć."
+  },
+  "codex.worktrees": {
+    "title": "Worktree Codex",
+    "description": "Robocze kopie repozytorium (git worktree) tworzone przez zadania Codex. Mogą zawierać niezacommitowaną pracę, więc sprawdź stan Git podany przy pozycji. Po usunięciu katalogu uruchom w repozytorium git worktree prune."
+  },
+  "cursor.worktrees": {
+    "title": "Worktree Cursor",
+    "description": "Robocze kopie repozytorium (git worktree) tworzone przez agentów Cursor. Mogą zawierać niezacommitowaną pracę, więc sprawdź stan Git podany przy pozycji. Po usunięciu katalogu uruchom w repozytorium git worktree prune."
+  },
+  "huggingface.datasets": {
+    "title": "Cache Hugging Face Datasets",
+    "description": "Dane przygotowane przez bibliotekę datasets z pobranych plików i Twoich kroków przetwarzania (pliki Arrow). Przetworzone warianty mogą wymagać Twoich skryptów i czasu obliczeń, żeby je odtworzyć.",
+    "regeneration": "Biblioteka datasets przygotuje dane ponownie, gdy skrypt je wczyta."
+  },
+  "whisper.models": {
+    "title": "Modele Whisper",
+    "description": "Modele rozpoznawania mowy pobrane przez OpenAI Whisper.",
+    "regeneration": "Whisper pobierze model ponownie przy następnym użyciu."
+  },
+  "artifact.playwright-results": {
+    "title": "Wyniki i raporty testów Playwright",
+    "description": "Wyniki przebiegów testów Playwright: trace, zrzuty ekranu, nagrania i raporty HTML, znalezione obok konfiguracji Playwright. Mogą być jedynym zapisem wcześniejszego błędu.",
+    "regeneration": "Uruchom testy ponownie; wyników wcześniejszych przebiegów nie da się odtworzyć."
+  },
+  "artifact.cypress-results": {
+    "title": "Zrzuty ekranu, nagrania i pobrane pliki Cypress",
+    "description": "Zrzuty ekranu, nagrania i pliki pobrane podczas testów Cypress, znalezione w folderze cypress projektu z konfiguracją Cypress. Testy, fixtures i pliki support nie są uwzględniane.",
+    "regeneration": "Uruchom testy ponownie; wyników wcześniejszych przebiegów nie da się odtworzyć."
+  },
+  "artifact.nox": {
+    "title": "Środowiska Nox (.nox)",
+    "description": "Środowiska wirtualne, które Nox tworzy dla każdej sesji testów.",
+    "regeneration": "nox utworzy je ponownie przy następnym uruchomieniu."
+  },
+  "artifact.nx-cache": {
+    "title": "Cache zadań Nx (.nx/cache)",
+    "description": "Zapisane wyniki zadań Nx w workspace, dzięki którym Nx pomija wykonaną już pracę. Reszta folderu .nx (dane workspace, demon) nie jest uwzględniana.",
+    "regeneration": "Nx wykona zadania ponownie i zapisze ich wyniki."
+  },
+  "artifact.dotnet-artifacts": {
+    "title": "Centralne wyniki kompilacji .NET (artifacts/bin, obj)",
+    "description": "Skompilowane biblioteki i pliki pośrednie rozwiązania .NET, które używa centralnego układu artifacts (UseArtifactsOutput). Opublikowane aplikacje i paczki w artifacts/publish oraz artifacts/package nie są uwzględniane.",
+    "regeneration": "dotnet build."
+  },
+  "artifact.dotnet-testresults": {
+    "title": "Wyniki testów .NET (TestResults)",
+    "description": "Wyniki, raporty pokrycia i zrzuty diagnostyczne zapisane przez dotnet test. Mogą być jedynym zapisem wcześniejszego błędu.",
+    "regeneration": "Uruchom testy ponownie; wyników wcześniejszych przebiegów nie da się odtworzyć."
   }
 }

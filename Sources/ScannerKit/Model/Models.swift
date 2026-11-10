@@ -148,6 +148,8 @@ public struct CommandCheck: Codable, Sendable, Hashable {
         case dockerEngine
         /// An image tag still points to the image that was scanned.
         case dockerImage
+        /// The tool still keeps its data in the folder that was scanned (`go env GOMODCACHE`).
+        case toolLocation
     }
 
     public var argv: [String]

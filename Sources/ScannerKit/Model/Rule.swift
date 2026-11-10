@@ -34,10 +34,15 @@ public struct Rule: Codable, Sendable, Identifiable {
     public var group: Bool
     public var versionPattern: String?
     public var note: String?
+    /// Checks repeated before removal; `{path}` in `argv` or `expected` is replaced by the matched path.
+    public var preconditions: [CommandCheck]
+    /// Each match must be a Git checkout (has a `.git` entry); its Git status is shown in the note.
+    public var gitStatusCheck: Bool
 
     private enum CodingKeys: String, CodingKey {
         case id, category, app, title, description, regeneration, safety, kind, paths, action
         case requiresAppClosed, ownerBundleIDs, defaultAgeDays, childTitle, excludeNames, group, versionPattern, note
+        case preconditions, gitStatusCheck
     }
 
     public init(from decoder: Decoder) throws {
@@ -60,6 +65,8 @@ public struct Rule: Codable, Sendable, Identifiable {
         group = try c.decodeIfPresent(Bool.self, forKey: .group) ?? false
         versionPattern = try c.decodeIfPresent(String.self, forKey: .versionPattern)
         note = try c.decodeIfPresent(String.self, forKey: .note)
+        preconditions = try c.decodeIfPresent([CommandCheck].self, forKey: .preconditions) ?? []
+        gitStatusCheck = try c.decodeIfPresent(Bool.self, forKey: .gitStatusCheck) ?? false
     }
 }
 
@@ -75,6 +82,11 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
     public var insideNone: [String]
     /// Required name of the parent directory.
     public var parentName: String?
+    /// At least one sibling of the parent directory must match one of these globs (the project file
+    /// next to `.nx` or `artifacts`).
+    public var parentSiblingsAny: [String]
+    /// When set, one of the files matched by `parentSiblingsAny` must contain one of these strings.
+    public var parentSiblingContainsAny: [String]
     public var title: String
     public var description: String
     public var regeneration: String?
@@ -85,8 +97,8 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
     public var gitStatusCheck: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case id, dirNames, siblingsAny, insideAny, insideNone, parentName, title, description, regeneration, safety, action
-        case childrenAreItems, gitStatusCheck
+        case id, dirNames, siblingsAny, insideAny, insideNone, parentName, parentSiblingsAny, parentSiblingContainsAny
+        case title, description, regeneration, safety, action, childrenAreItems, gitStatusCheck
     }
 
     public init(from decoder: Decoder) throws {
@@ -97,6 +109,8 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
         insideAny = try c.decodeIfPresent([String].self, forKey: .insideAny) ?? []
         insideNone = try c.decodeIfPresent([String].self, forKey: .insideNone) ?? []
         parentName = try c.decodeIfPresent(String.self, forKey: .parentName)
+        parentSiblingsAny = try c.decodeIfPresent([String].self, forKey: .parentSiblingsAny) ?? []
+        parentSiblingContainsAny = try c.decodeIfPresent([String].self, forKey: .parentSiblingContainsAny) ?? []
         title = try c.decode(String.self, forKey: .title)
         description = try c.decode(String.self, forKey: .description)
         regeneration = try c.decodeIfPresent(String.self, forKey: .regeneration)
@@ -230,9 +244,15 @@ public struct RuleCatalog: Sendable {
             if case .command(let argv)? = rule.action, !CommandPolicy.isAllowedCleanCommand(argv) {
                 throw LoadError.invalid(rule.id, "command not allow-listed: \(argv.joined(separator: " "))")
             }
+            for check in rule.preconditions where !CommandPolicy.isAllowedCheckCommand(check.argv) {
+                throw LoadError.invalid(rule.id, "check not allow-listed: \(check.argv.joined(separator: " "))")
+            }
         }
         for artifact in artifacts {
             guard seen.insert(artifact.id).inserted else { throw LoadError.duplicateID(artifact.id) }
+            if !artifact.parentSiblingContainsAny.isEmpty, artifact.parentSiblingsAny.isEmpty {
+                throw LoadError.invalid(artifact.id, "parentSiblingContainsAny needs parentSiblingsAny")
+            }
             if case .command(let argv) = artifact.action, !CommandPolicy.isAllowedCleanCommand(argv) {
                 throw LoadError.invalid(artifact.id, "command not allow-listed: \(argv.joined(separator: " "))")
             }

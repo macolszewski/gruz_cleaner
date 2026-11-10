@@ -400,6 +400,7 @@ extension CommandCheck.Purpose {
         switch self {
         case .dockerEngine: LocalizedMessage("Docker now connects to a different engine than the one scanned. Scan again.")
         case .dockerImage: LocalizedMessage("The image tag now points to a different image. Scan again.")
+        case .toolLocation: LocalizedMessage("The tool now keeps its data in a different folder than the one scanned. Scan again.")
         }
     }
 }

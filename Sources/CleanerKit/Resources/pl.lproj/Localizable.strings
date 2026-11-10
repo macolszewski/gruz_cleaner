@@ -77,6 +77,7 @@
 "Cannot verify the item before removing it. Scan again." = "Nie można sprawdzić elementu przed usunięciem. Wykonaj nowy skan.";
 "Cannot write the operation log: %@" = "Nie można zapisać dziennika operacji: %@";
 "Docker now connects to a different engine than the one scanned. Scan again." = "Docker łączy się teraz z innym silnikiem niż podczas skanu. Wykonaj nowy skan.";
+"The tool now keeps its data in a different folder than the one scanned. Scan again." = "Narzędzie trzyma teraz dane w innym folderze niż podczas skanu. Wykonaj nowy skan.";
 "The command was stopped before it finished; part of the data may already be removed." = "Polecenie zostało przerwane przed zakończeniem; część danych mogła już zostać usunięta.";
 "The image tag now points to a different image. Scan again." = "Tag wskazuje teraz inny obraz. Wykonaj nowy skan.";
 "This result is missing from the operation log: %@" = "Tego wyniku brakuje w dzienniku operacji: %@";

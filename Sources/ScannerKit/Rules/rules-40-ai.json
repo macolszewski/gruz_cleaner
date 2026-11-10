@@ -148,6 +148,59 @@
     "defaultAgeDays": 30
   },
   {
+    "id": "codex.archived-sessions",
+    "category": "ai",
+    "app": "Codex",
+    "title": "Archived Codex sessions",
+    "description": "Records of Codex conversations you archived.",
+    "regeneration": "Cannot be recreated.",
+    "safety": "caution",
+    "paths": [
+      "~/.codex/archived_sessions/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "defaultAgeDays": 30
+  },
+  {
+    "id": "codex.worktrees",
+    "category": "projects",
+    "app": "Codex",
+    "title": "Codex worktrees",
+    "description": "Working copies of a repository (git worktree) created by Codex tasks. They may contain uncommitted work, so check the Git status shown for the item. After removing the folder, run git worktree prune in the repository.",
+    "safety": "caution",
+    "paths": [
+      "~/.codex/worktrees/*",
+      "~/.codex/worktrees/*/*"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "gitStatusCheck": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "cursor.worktrees",
+    "category": "projects",
+    "app": "Cursor",
+    "title": "Cursor worktrees",
+    "description": "Working copies of a repository (git worktree) created by Cursor agents. They may contain uncommitted work, so check the Git status shown for the item. After removing the folder, run git worktree prune in the repository.",
+    "safety": "caution",
+    "paths": [
+      "~/.cursor/worktrees/*",
+      "~/.cursor/worktrees/*/*"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "gitStatusCheck": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
     "id": "codex.tmp",
     "category": "ai",
     "app": "Codex",
@@ -220,6 +273,25 @@
     }
   },
   {
+    "id": "huggingface.datasets",
+    "category": "ai",
+    "app": "Hugging Face",
+    "title": "Hugging Face Datasets cache",
+    "description": "Data that the datasets library prepared from downloads and your processing steps (Arrow files). Processed variants may need your scripts and computing time to recreate.",
+    "regeneration": "The datasets library prepares the data again when a script loads it.",
+    "safety": "caution",
+    "paths": [
+      "~/.cache/huggingface/datasets/*"
+    ],
+    "group": true,
+    "excludeNames": [
+      "*.lock"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
     "id": "torch.cache",
     "category": "ai",
     "app": "PyTorch",
@@ -230,6 +302,22 @@
     "paths": [
       "~/.cache/torch"
     ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "whisper.models",
+    "category": "ai",
+    "app": "Whisper",
+    "title": "Whisper models",
+    "description": "Speech recognition models that OpenAI Whisper downloads.",
+    "regeneration": "Whisper downloads the model again the next time it is used.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.cache/whisper/*.pt"
+    ],
+    "group": true,
     "action": {
       "type": "trash"
     }

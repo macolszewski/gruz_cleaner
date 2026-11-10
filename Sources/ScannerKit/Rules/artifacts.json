@@ -245,5 +245,111 @@
     "description": "Compiled files of a Maven project.",
     "regeneration": "mvn package.",
     "safety": "regenerable"
+  },
+  {
+    "id": "artifact.playwright-results",
+    "dirNames": [
+      "test-results",
+      "playwright-report",
+      "blob-report"
+    ],
+    "siblingsAny": [
+      "playwright.config.ts",
+      "playwright.config.js",
+      "playwright.config.mts",
+      "playwright.config.mjs",
+      "playwright.config.cts",
+      "playwright.config.cjs"
+    ],
+    "insideNone": [
+      "*.spec.ts",
+      "*.spec.js",
+      "*.test.ts",
+      "*.test.js"
+    ],
+    "title": "Playwright test results and reports",
+    "description": "Results of Playwright test runs: traces, screenshots, videos and HTML reports, found next to a Playwright configuration. They can be the only record of an earlier failure.",
+    "regeneration": "Run the tests again; the results of earlier runs cannot be recreated.",
+    "safety": "caution"
+  },
+  {
+    "id": "artifact.cypress-results",
+    "dirNames": [
+      "screenshots",
+      "videos",
+      "downloads"
+    ],
+    "parentName": "cypress",
+    "parentSiblingsAny": [
+      "cypress.config.*",
+      "cypress.json"
+    ],
+    "title": "Cypress screenshots, videos and downloads",
+    "description": "Screenshots, videos and downloaded files from Cypress test runs, found in the cypress folder of a project with a Cypress configuration. Tests, fixtures and support files are not included.",
+    "regeneration": "Run the tests again; the results of earlier runs cannot be recreated.",
+    "safety": "caution"
+  },
+  {
+    "id": "artifact.nox",
+    "dirNames": [
+      ".nox"
+    ],
+    "siblingsAny": [
+      "noxfile.py"
+    ],
+    "title": "Nox environments (.nox)",
+    "description": "Virtual environments that Nox creates for each test session.",
+    "regeneration": "nox creates them again on the next run.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.nx-cache",
+    "dirNames": [
+      "cache"
+    ],
+    "parentName": ".nx",
+    "parentSiblingsAny": [
+      "nx.json"
+    ],
+    "title": "Nx task cache (.nx/cache)",
+    "description": "Saved outputs of Nx tasks in a workspace, used to skip work that was already done. The rest of the .nx folder (workspace data, daemon) is not included.",
+    "regeneration": "Nx runs the tasks again and caches their outputs.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.dotnet-artifacts",
+    "dirNames": [
+      "bin",
+      "obj"
+    ],
+    "parentName": "artifacts",
+    "parentSiblingsAny": [
+      "Directory.Build.props"
+    ],
+    "parentSiblingContainsAny": [
+      "UseArtifactsOutput",
+      "ArtifactsPath"
+    ],
+    "title": ".NET central build output (artifacts/bin, obj)",
+    "description": "Compiled libraries and intermediate files of a .NET solution that uses the central artifacts layout (UseArtifactsOutput). Published apps and packages in artifacts/publish and artifacts/package are not included.",
+    "regeneration": "dotnet build.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.dotnet-testresults",
+    "dirNames": [
+      "TestResults"
+    ],
+    "siblingsAny": [
+      "*.csproj",
+      "*.fsproj",
+      "*.vbproj",
+      "*.sln",
+      "*.slnx"
+    ],
+    "title": ".NET test results (TestResults)",
+    "description": "Results, coverage reports and diagnostic dumps written by dotnet test. They can be the only record of an earlier failure.",
+    "regeneration": "Run the tests again; the results of earlier runs cannot be recreated.",
+    "safety": "caution"
   }
 ]

@@ -30,9 +30,14 @@ enum RuleSource {
         var sizes = await SizeCalculator.measureAll(resolved.flatMap(\.1).filter { exclusions[$0] == nil })
         for (path, excluded) in exclusions { sizes[path] = SizeCalculator.measure(path, excluding: excluded) }
 
+        let checkouts = resolved.filter(\.0.gitStatusCheck).flatMap(\.1)
+        let gitNotes = await concurrentMap(checkouts, width: 4) { await ProjectSource.gitStatusNote($0) }.compactMapValues { $0 }
+
         var items: [ScanItem] = []
         for (rule, paths) in resolved {
-            if let item = makeItem(rule: rule, paths: paths, sizes: sizes, home: ctx.options.home) { items.append(item) }
+            if let item = makeItem(rule: rule, paths: paths, sizes: sizes, home: ctx.options.home, notes: gitNotes) {
+                items.append(item)
+            }
         }
         return items
     }
@@ -41,6 +46,7 @@ enum RuleSource {
         let bases = rule.paths.flatMap { Paths.glob($0, home: home) }
         let filtered = bases.filter { path in
             let name = (path as NSString).lastPathComponent
+            if rule.gitStatusCheck, !Paths.exists(Paths.join(path, ".git")) { return false }
             return !rule.excludeNames.contains { Paths.fnmatch($0, name) }
         }
         switch rule.kind {
@@ -75,15 +81,19 @@ enum RuleSource {
         }.sorted()
     }
 
-    static func makeItem(rule: Rule, paths: [String], sizes: [String: SizeInfo], home: String) -> ScanItem? {
+    static func makeItem(rule: Rule, paths: [String], sizes: [String: SizeInfo], home: String, notes: [String: String] = [:]) -> ScanItem? {
         func base(id: String, title: String, paths: [String], info: SizeInfo) -> ScanItem {
-            ScanItem(
+            var item = ScanItem(
                 id: id, ruleID: rule.id, category: rule.category, title: title, app: rule.app,
                 description: rule.description, regeneration: rule.regeneration, safety: rule.safety,
                 sizeBytes: info.allocatedBytes, lastModified: info.newestModification, paths: paths,
                 action: resolvedAction(rule.action, path: paths.first), ownerBundleIDs: rule.ownerBundleIDs, requiresAppClosed: rule.requiresAppClosed,
-                defaultAgeDays: rule.defaultAgeDays, note: rule.note
+                defaultAgeDays: rule.defaultAgeDays, note: paths.first.flatMap { notes[$0] } ?? rule.note
             ).measured(info)
+            if !rule.preconditions.isEmpty, let path = paths.first {
+                item.preconditions = rule.preconditions.map { resolved($0, path: path) }
+            }
+            return item
         }
 
         let grouped = rule.group || paths.count > 1 || rule.kind == .versions
@@ -116,6 +126,11 @@ enum RuleSource {
         guard case .command(let argv) = action, argv.contains(pathPlaceholder) else { return action }
         guard let path else { return nil }
         return .command(argv: argv.map { $0 == pathPlaceholder ? path : $0 })
+    }
+
+    static func resolved(_ check: CommandCheck, path: String) -> CommandCheck {
+        func fill(_ s: String) -> String { s == pathPlaceholder ? path : s }
+        return CommandCheck(argv: check.argv.map(fill), expected: fill(check.expected), purpose: check.purpose)
     }
 
     static func childTitle(_ path: String, style: Rule.ChildTitle, home: String) -> String {

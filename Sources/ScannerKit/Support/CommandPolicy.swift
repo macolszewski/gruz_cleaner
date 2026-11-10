@@ -19,6 +19,9 @@ public enum CommandPolicy {
         [.literal("npm"), .literal("cache"), .literal("clean"), .literal("--force")],
         [.literal("brew"), .literal("cleanup"), .literal("--prune=all")],
         [.literal("dotnet"), .literal("nuget"), .literal("locals"), .literal("all"), .literal("--clear")],
+        // Go marks module files read-only, so its own command removes them; a `CommandCheck` on
+        // `go env GOMODCACHE` binds it to the folder that was measured.
+        [.literal("go"), .literal("clean"), .literal("-modcache")],
     ]
 
     private static let readOnlyPatterns: [[Token]] = [
@@ -32,6 +35,7 @@ public enum CommandPolicy {
     private static let checkPatterns: [[Token]] = [
         [.literal("docker"), .literal("info"), .literal("--format"), .literal("{{.ID}} {{.Name}}")],
         [.literal("docker"), .literal("image"), .literal("inspect"), .literal("--format"), .literal("{{.Id}}"), .operand],
+        [.literal("go"), .literal("env"), .literal("GOMODCACHE")],
     ]
 
     /// Whether `argv` may run as a check before a removal.
