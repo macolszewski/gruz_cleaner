@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.1]
 
 Fixes from an external technical audit of 1.0.0. The theme: what the review sheet shows must be
 exactly what gets removed, and results must say honestly what happened.
