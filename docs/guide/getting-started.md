@@ -10,8 +10,9 @@ Download `GRUZ-<version>.zip` from the
 and move `GRUZ.app` to the Applications folder. GRUZ needs macOS 15 or later on Apple Silicon.
 
 !!! note "The first launch"
-    Release builds are not notarized. The first time, Control-click `GRUZ.app` in the Finder and
-    choose **Open**, then confirm. Later launches work as usual.
+    Release builds are not notarized, so macOS refuses to open GRUZ the first time. Open
+    System Settings > Privacy & Security, click **Open Anyway** next to the GRUZ message and
+    confirm. Later launches work as usual.
 
 ### Build from source
 

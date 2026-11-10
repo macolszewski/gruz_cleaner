@@ -8,7 +8,7 @@ when GRUZ cannot be sure, it shows the data and leaves the decision to you.
 - **macOS 15 or later, Apple Silicon only.** Release builds are made on Apple Silicon; there is no
   Intel or universal build. You can [build from source](../guide/getting-started.md#build-from-source)
   on other supported Macs.
-- **Not notarized.** The first launch needs Control-click > **Open**. Builds signed ad hoc lose the
+- **Not notarized.** The first launch needs **Open Anyway** in System Settings > Privacy & Security. Builds signed ad hoc lose the
   Full Disk Access grant after every rebuild.
 - **English and Polish only.** See [Localization](localization.md) for adding a language.
 - **The command line tool only reports.** `gruz-scan` is not part of the release zip and cannot

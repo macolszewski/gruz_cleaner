@@ -135,8 +135,9 @@ Details: [architecture and safety model](https://macolszewski.github.io/gruz_cle
 ## Install
 
 Download `GRUZ-<version>.zip` from the [latest release](https://github.com/macolszewski/gruz_cleaner/releases/latest),
-unzip it and move `GRUZ.app` to Applications. Builds are not notarized yet, so on the first
-start Control-click the app and choose **Open**.
+unzip it and move `GRUZ.app` to Applications. Builds are not notarized yet: on the first start
+macOS refuses to open the app, so open System Settings > Privacy & Security and click
+**Open Anyway** next to the GRUZ message.
 
 For the full picture (Trash, Mail, Messages, iPhone backups) grant **Full Disk Access** in
 System Settings > Privacy & Security. GRUZ works without it and tells you what it could not
