@@ -140,7 +140,9 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
               let helper = Bundle.cleanerKit.url(forResource: "claude_mem_reindex", withExtension: "py", subdirectory: "Helpers") else {
             throw LocalizedMessage("uv or the indexing script is missing. Install uv and rebuild GRUZ.")
         }
-        return (uv, ["run", "--no-project", "--with", "chromadb==1.5.9", "--with", "onnxruntime>=1.20", "--with", "protobuf<7", "python", helper.path])
+        // Python is pinned: uv would otherwise pick the newest interpreter on the machine, for which
+        // onnxruntime may not have wheels yet. uv downloads this version when it is missing.
+        return (uv, ["run", "--no-project", "--python", "3.13", "--with", "chromadb==1.5.9", "--with", "onnxruntime>=1.20", "--with", "protobuf<7", "python", helper.path])
     }
 
     public func prepareIndex(location: ClaudeMemoryLocation) async throws {

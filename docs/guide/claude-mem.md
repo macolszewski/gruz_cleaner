@@ -46,7 +46,7 @@ The operation spans the worker, SQLite, Chroma and the file system, so it is not
 
 - claude-mem worker 13.x, version 13.28.0 or later, running when maintenance starts. An unknown schema stops the operation with an error. Newer 13.x versions are not guaranteed to be compatible.
 - [Bun](https://bun.sh), to start the worker again.
-- [uv](https://docs.astral.sh/uv/), to run the reindex helper with `chromadb==1.5.9`, `onnxruntime>=1.20` and `protobuf<7`. The first run may download these packages and the default embedding model; embedding itself runs locally.
+- [uv](https://docs.astral.sh/uv/), to run the reindex helper on Python 3.13 with `chromadb==1.5.9`, `onnxruntime>=1.20` and `protobuf<7` (uv downloads Python 3.13 if it is missing). The first run may download these packages and the default embedding model; embedding itself runs locally.
 - Local Chroma with the default embedding model. Remote Chroma and embedding functions that need API keys are refused before anything is deleted.
 - No agent sessions using claude-mem during maintenance.
 
@@ -83,7 +83,7 @@ python3 -m unittest discover -s Tests/ClaudeMemoryReindexTests -v
 The Python tests use a fake Chroma client. An optional integration test runs a real rebuild with Chroma and checks embeddings and search on synthetic memory:
 
 ```bash
-CLEANER_TEST_CHROMA=1 uv run --no-project \
+CLEANER_TEST_CHROMA=1 uv run --no-project --python 3.13 \
   --with chromadb==1.5.9 --with 'onnxruntime>=1.20' --with 'protobuf<7' \
   python -m unittest discover -s Tests/ClaudeMemoryReindexTests -v
 ```

@@ -40,6 +40,8 @@ exactly what gets removed, and results must say honestly what happened.
 - The claude-mem index helper parsed `facts` and file lists differently from claude-mem, so a fact
   stored as a JSON string was not indexed. It now follows claude-mem's parsers, and a freshly rebuilt
   index is verified against the current database before it is installed.
+- The claude-mem helper ran on the newest Python found by uv, for which `onnxruntime` may have no
+  wheels yet (Python 3.15); it now runs on Python 3.13.
 
 ### Changed
 

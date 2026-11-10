@@ -22,6 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The macos-15 image defaults to an older Xcode; GRUZ needs Xcode 26 (Swift 6.2).
+      - name: Select Xcode 26
+        run: |
+          xcode="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$xcode" ]; then echo "Xcode 26 is not installed on this runner"; ls -d /Applications/Xcode*.app; exit 1; fi
+          sudo xcode-select -s "$xcode"
+
       - name: Toolchain
         run: swift --version
 
@@ -47,7 +54,7 @@ jobs:
         env:
           CLEANER_TEST_CHROMA: "1"
         run: >
-          uv run --no-project --with "chromadb==1.5.9" --with "onnxruntime>=1.20" --with "protobuf<7"
+          uv run --no-project --python 3.13 --with "chromadb==1.5.9" --with "onnxruntime>=1.20" --with "protobuf<7"
           python -m unittest discover -s Tests/ClaudeMemoryReindexTests -v
 
       - name: Localizations
