@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>The claude-mem queue holds %lld messages. Wait until it is empty.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Kolejka claude-mem zawiera %#@messages@. Poczekaj na jej opróżnienie.</string>
+		<key>messages</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld wiadomość</string>
+			<key>few</key>
+			<string>%lld wiadomości</string>
+			<key>many</key>
+			<string>%lld wiadomości</string>
+			<key>other</key>
+			<string>%lld wiadomości</string>
+		</dict>
+	</dict>
+	<key>Removed only part of the data (%lld records):</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Usunięto część danych (%#@records@):</string>
+		<key>records</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld rekord</string>
+			<key>few</key>
+			<string>%lld rekordy</string>
+			<key>many</key>
+			<string>%lld rekordów</string>
+			<key>other</key>
+			<string>%lld rekordu</string>
+		</dict>
+	</dict>
+	<key>Rebuilding Chroma: %lld of %lld documents (%@).</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Odbudowa Chroma: %1$lld z %2$#@documents@ (%3$@).</string>
+		<key>documents</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%2$lld dokumentu</string>
+			<key>few</key>
+			<string>%2$lld dokumentów</string>
+			<key>many</key>
+			<string>%2$lld dokumentów</string>
+			<key>other</key>
+			<string>%2$lld dokumentu</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

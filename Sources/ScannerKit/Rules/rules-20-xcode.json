@@ -1,0 +1,74 @@
+[
+  {
+    "id": "xcode.deriveddata",
+    "category": "xcode",
+    "app": "Xcode",
+    "title": "DerivedData (Xcode build results)",
+    "description": "Intermediate files, indexes and build results of Xcode projects, one folder per project. ModuleCache is the shared cache of compiled modules.",
+    "regeneration": "Xcode recreates them on the next build (the first build takes longer).",
+    "safety": "safe",
+    "paths": ["~/Library/Developer/Xcode/DerivedData/*"],
+    "group": true,
+    "childTitle": "derivedData",
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["com.apple.dt.Xcode"]
+  },
+  {
+    "id": "xcode.devicesupport",
+    "category": "xcode",
+    "app": "Xcode",
+    "title": "Device symbols (DeviceSupport)",
+    "description": "Debug symbols copied from connected iPhones, iPads and watches, one folder per OS version.",
+    "regeneration": "Xcode copies them again when you connect the device (a few minutes).",
+    "safety": "safe",
+    "paths": ["~/Library/Developer/Xcode/*DeviceSupport/*"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "xcode.archives",
+    "category": "xcode",
+    "app": "Xcode",
+    "title": "Xcode archives",
+    "description": "Built app versions submitted to the App Store or TestFlight, with the dSYM files needed to read crash reports.",
+    "regeneration": "The exact same build cannot be recreated.",
+    "safety": "caution",
+    "paths": ["~/Library/Developer/Xcode/Archives/*"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "xcode.previews",
+    "category": "xcode",
+    "app": "Xcode",
+    "title": "SwiftUI previews",
+    "description": "Simulators and builds used by SwiftUI Previews.",
+    "safety": "safe",
+    "paths": ["~/Library/Developer/Xcode/UserData/Previews", "~/Library/Developer/CoreSimulator/Caches"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "xcode.caches",
+    "category": "xcode",
+    "app": "Xcode",
+    "title": "Xcode cache",
+    "description": "Xcode app cache (including documentation and downloads).",
+    "safety": "safe",
+    "paths": ["~/Library/Caches/com.apple.dt.Xcode"],
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["com.apple.dt.Xcode"]
+  },
+  {
+    "id": "xcode.simulator-logs",
+    "category": "xcode",
+    "app": "Simulator",
+    "title": "Simulator logs",
+    "description": "System logs of iOS simulators.",
+    "safety": "safe",
+    "paths": ["~/Library/Logs/CoreSimulator"],
+    "action": { "type": "trash" }
+  }
+]

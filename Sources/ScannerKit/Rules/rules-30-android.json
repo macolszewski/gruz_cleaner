@@ -1,0 +1,49 @@
+[
+  {
+    "id": "android.avd",
+    "category": "android",
+    "app": "Android Emulator",
+    "title": "Android emulators (AVD)",
+    "description": "Disks and snapshots of Android emulators, with the apps and data installed in them. Also remove the .ini file with the same name if you want the emulator to disappear from the list.",
+    "regeneration": "You can create the emulator again in Android Studio or with avdmanager.",
+    "safety": "caution",
+    "paths": ["~/.android/avd/*.avd"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "android.system-images",
+    "category": "android",
+    "app": "Android SDK",
+    "title": "Android system images (SDK)",
+    "description": "System images that emulators boot from. Without them, an emulator for that Android version will not start.",
+    "regeneration": "sdkmanager downloads the image again.",
+    "safety": "regenerable",
+    "paths": ["/opt/homebrew/share/android-commandlinetools/system-images/*/*", "~/Library/Android/sdk/system-images/*/*"],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "android.ndk",
+    "category": "android",
+    "app": "Android SDK",
+    "title": "Android NDK",
+    "description": "Tools for compiling native code (C/C++) for Android. Needed by Flutter and React Native projects with native code.",
+    "regeneration": "sdkmanager or Gradle downloads the required version.",
+    "safety": "regenerable",
+    "paths": ["/opt/homebrew/share/android-commandlinetools/ndk/*", "~/Library/Android/sdk/ndk/*"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "android.cache",
+    "category": "android",
+    "app": "Android SDK",
+    "title": "Android tools cache",
+    "description": "Cache of sdkmanager and other Android tools.",
+    "safety": "safe",
+    "paths": ["~/.android/cache"],
+    "action": { "type": "trash" }
+  }
+]

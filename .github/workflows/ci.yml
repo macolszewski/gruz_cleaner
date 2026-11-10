@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Swift tests
+        run: swift test
+
+      - name: Python helper tests
+        run: python3 -m unittest discover -s Tests/ClaudeMemoryReindexTests -v
+
+      - name: Localizations
+        run: ./scripts/check-localizations.py
+
+      - name: App bundle
+        run: ./scripts/build-app.sh

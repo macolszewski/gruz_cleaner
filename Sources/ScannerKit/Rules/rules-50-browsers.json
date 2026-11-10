@@ -1,0 +1,108 @@
+[
+  {
+    "id": "brave.cache",
+    "category": "browsers",
+    "app": "Brave",
+    "title": "Brave cache",
+    "description": "Downloaded pages, images and scripts, plus compiled page code. Quit Brave before removing it.",
+    "regeneration": "Pages load again from the network.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/BraveSoftware",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser/*/Code Cache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser/*/GPUCache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser/component_crx_cache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser/extensions_crx_cache"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["com.brave.Browser"]
+  },
+  {
+    "id": "brave.serviceworker",
+    "category": "browsers",
+    "app": "Brave",
+    "title": "Brave Service Worker storage",
+    "description": "Files saved by websites for offline use (web apps, PWAs). Websites download them again; sign-ins and settings are kept.",
+    "safety": "safe",
+    "paths": ["~/Library/Application Support/BraveSoftware/Brave-Browser/*/Service Worker/CacheStorage", "~/Library/Application Support/BraveSoftware/Brave-Browser/*/Service Worker/ScriptCache"],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["com.brave.Browser"]
+  },
+  {
+    "id": "chrome.cache",
+    "category": "browsers",
+    "app": "Google Chrome",
+    "title": "Chrome cache",
+    "description": "Downloaded pages, images and scripts, plus compiled page code. Quit Chrome before removing it.",
+    "regeneration": "Pages load again from the network.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/Google/Chrome",
+      "~/Library/Application Support/Google/Chrome/*/Code Cache",
+      "~/Library/Application Support/Google/Chrome/*/GPUCache",
+      "~/Library/Application Support/Google/Chrome/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Google/Chrome/component_crx_cache",
+      "~/Library/Application Support/Google/Chrome/extensions_crx_cache"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["com.google.Chrome"]
+  },
+  {
+    "id": "edge.cache",
+    "category": "browsers",
+    "app": "Microsoft Edge",
+    "title": "Edge cache",
+    "description": "Page and compiled code cache of Microsoft Edge.",
+    "safety": "safe",
+    "paths": ["~/Library/Caches/Microsoft Edge", "~/Library/Application Support/Microsoft Edge/*/Code Cache", "~/Library/Application Support/Microsoft Edge/*/Service Worker/CacheStorage"],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["com.microsoft.edgemac"]
+  },
+  {
+    "id": "firefox.cache",
+    "category": "browsers",
+    "app": "Firefox",
+    "title": "Firefox cache",
+    "description": "Firefox page cache.",
+    "safety": "safe",
+    "paths": ["~/Library/Caches/Firefox"],
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["org.mozilla.firefox"]
+  },
+  {
+    "id": "safari.cache",
+    "category": "browsers",
+    "app": "Safari",
+    "title": "Safari cache",
+    "description": "Safari page cache. Requires Full Disk Access.",
+    "safety": "safe",
+    "paths": ["~/Library/Caches/com.apple.Safari"],
+    "action": { "type": "trash" },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": ["com.apple.Safari"]
+  },
+  {
+    "id": "playwright.chrome-profiles",
+    "category": "browsers",
+    "app": "Chrome (debug)",
+    "title": "Chrome debugging profiles",
+    "description": "Separate profiles of Chrome started with --user-data-dir for automation and debugging (e.g. by agents).",
+    "safety": "caution",
+    "paths": ["~/chrome-debug-*"],
+    "group": true,
+    "action": { "type": "trash" }
+  }
+]

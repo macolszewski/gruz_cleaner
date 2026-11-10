@@ -1,0 +1,214 @@
+[
+  {
+    "id": "artifact.node_modules",
+    "dirNames": [
+      "node_modules"
+    ],
+    "siblingsAny": [
+      "package.json"
+    ],
+    "title": "npm dependencies (node_modules)",
+    "description": "The project's installed JavaScript packages.",
+    "regeneration": "npm install (or yarn/pnpm/bun install) in the project folder.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.venv",
+    "dirNames": [
+      ".venv",
+      "venv",
+      "env",
+      ".env"
+    ],
+    "insideAny": [
+      "pyvenv.cfg"
+    ],
+    "title": "Python environments (.venv)",
+    "description": "A Python virtual environment with the project's installed packages.",
+    "regeneration": "uv sync, poetry install or pip install -r requirements.txt.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.dotnet-bin",
+    "dirNames": [
+      "bin",
+      "obj"
+    ],
+    "siblingsAny": [
+      "*.csproj",
+      "*.fsproj",
+      "*.vbproj"
+    ],
+    "title": ".NET build output (bin, obj)",
+    "description": "Compiled libraries and intermediate files of .NET projects.",
+    "regeneration": "dotnet build or a build in Rider.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.swiftpm",
+    "dirNames": [
+      ".build"
+    ],
+    "siblingsAny": [
+      "Package.swift"
+    ],
+    "title": "Swift Package Manager build (.build)",
+    "description": "Downloaded dependencies and build output of a Swift package.",
+    "regeneration": "swift build.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.deriveddata",
+    "dirNames": [
+      "DerivedData"
+    ],
+    "siblingsAny": [
+      "*.xcodeproj",
+      "*.xcworkspace",
+      "Package.swift",
+      "project.yml"
+    ],
+    "title": "DerivedData in projects",
+    "description": "Xcode build output stored in the project folder.",
+    "regeneration": "Build in Xcode.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.flutter-build",
+    "dirNames": [
+      "build"
+    ],
+    "siblingsAny": [
+      "pubspec.yaml",
+      "build.gradle",
+      "build.gradle.kts",
+      "settings.gradle",
+      "settings.gradle.kts",
+      "CMakeLists.txt",
+      "setup.py",
+      "pyproject.toml"
+    ],
+    "title": "Build folders",
+    "description": "Build output (Flutter, Gradle, CMake, Python).",
+    "regeneration": "Build the project again.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.dart_tool",
+    "dirNames": [
+      ".dart_tool"
+    ],
+    "siblingsAny": [
+      "pubspec.yaml"
+    ],
+    "title": "Dart tool cache (.dart_tool)",
+    "description": "Package configuration and Dart/Flutter tool cache of the project.",
+    "regeneration": "flutter pub get.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.gradle-project",
+    "dirNames": [
+      ".gradle",
+      ".kotlin"
+    ],
+    "siblingsAny": [
+      "build.gradle",
+      "build.gradle.kts",
+      "settings.gradle",
+      "settings.gradle.kts",
+      "gradlew"
+    ],
+    "title": "Gradle cache in projects",
+    "description": "Local Gradle and Kotlin cache of the project.",
+    "regeneration": "Rebuilt on the next build.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.pods",
+    "dirNames": [
+      "Pods"
+    ],
+    "siblingsAny": [
+      "Podfile"
+    ],
+    "title": "CocoaPods dependencies (Pods)",
+    "description": "Installed pods of an iOS project.",
+    "regeneration": "pod install.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.web-build",
+    "dirNames": [
+      "dist",
+      ".next",
+      ".nuxt",
+      ".turbo",
+      ".parcel-cache",
+      ".svelte-kit",
+      ".angular",
+      ".vite",
+      "coverage"
+    ],
+    "siblingsAny": [
+      "package.json"
+    ],
+    "title": "Frontend builds and web tool caches",
+    "description": "Build output and caches of JavaScript tools (Vite, Next.js, Nuxt, Turbo, Angular) and test coverage reports.",
+    "regeneration": "npm run build.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.rust-target",
+    "dirNames": [
+      "target"
+    ],
+    "siblingsAny": [
+      "Cargo.toml"
+    ],
+    "title": "Rust build artifacts (target)",
+    "description": "Build output and intermediate files of a Cargo project (debug and release profiles).",
+    "regeneration": "cargo build.",
+    "safety": "regenerable"
+  },
+  {
+    "id": "artifact.python-caches",
+    "dirNames": [
+      "__pycache__",
+      ".pytest_cache",
+      ".mypy_cache",
+      ".ruff_cache",
+      ".tox",
+      ".hypothesis"
+    ],
+    "title": "Python tool caches",
+    "description": "Compiled bytecode (.pyc) and caches of pytest, mypy, ruff and tox.",
+    "regeneration": "Recreated automatically when run.",
+    "safety": "safe"
+  },
+  {
+    "id": "artifact.agent-worktrees",
+    "dirNames": [
+      "worktrees"
+    ],
+    "parentName": ".claude",
+    "childrenAreItems": true,
+    "gitStatusCheck": true,
+    "title": "Claude Code agent worktrees",
+    "description": "Working copies of a repository (git worktree) created by Claude Code agents. They may contain uncommitted work, so check the Git status shown for the item. After removing the folder, run git worktree prune in the repository.",
+    "safety": "caution"
+  },
+  {
+    "id": "artifact.maven-target",
+    "dirNames": [
+      "target"
+    ],
+    "siblingsAny": [
+      "pom.xml"
+    ],
+    "title": "Maven build output",
+    "description": "Compiled files of a Maven project.",
+    "regeneration": "mvn package.",
+    "safety": "regenerable"
+  }
+]

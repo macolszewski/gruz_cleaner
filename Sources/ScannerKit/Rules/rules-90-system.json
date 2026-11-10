@@ -1,0 +1,91 @@
+[
+  {
+    "id": "system.temp",
+    "category": "system",
+    "app": "macOS",
+    "title": "User temporary files",
+    "description": "Temporary files of apps in the system $TMPDIR folder. Apps remove them on their own, but they are often left behind after crashes. By default only files older than 7 days are shown, because newer ones may be in use.",
+    "safety": "safe",
+    "paths": ["$TMPDIR/*"],
+    "group": true,
+    "action": { "type": "trash" },
+    "defaultAgeDays": 7
+  },
+  {
+    "id": "system.diagnostics",
+    "category": "system",
+    "app": "macOS",
+    "title": "Crash reports",
+    "description": "Reports of app crashes and hangs collected by macOS.",
+    "safety": "safe",
+    "paths": ["~/Library/Logs/DiagnosticReports"],
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "system.ios-updates",
+    "category": "system",
+    "app": "Finder",
+    "title": "Downloaded iOS updates",
+    "description": "iPhone and iPad software update files downloaded when updating through the Mac.",
+    "safety": "safe",
+    "paths": ["~/Library/iTunes/iPhone Software Updates", "~/Library/iTunes/iPad Software Updates"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "system.ios-backups",
+    "category": "system",
+    "app": "Finder",
+    "title": "iPhone and iPad backups",
+    "description": "Local backups of iOS devices. If the iCloud backup is up to date, the local one may be unnecessary. Requires Full Disk Access.",
+    "regeneration": "An old backup cannot be recreated; you can make a new one by connecting the device.",
+    "safety": "caution",
+    "paths": ["~/Library/Application Support/MobileSync/Backup/*"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "system.mail-downloads",
+    "category": "system",
+    "app": "Mail",
+    "title": "Attachments opened in Mail",
+    "description": "Copies of attachments opened in Mail. The originals stay in the messages.",
+    "safety": "safe",
+    "paths": ["~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads"],
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "system.logs",
+    "category": "system",
+    "app": "Various",
+    "title": "App logs",
+    "description": "Log files written by apps to ~/Library/Logs. They are useful only for diagnosing problems.",
+    "safety": "safe",
+    "paths": ["~/Library/Logs/*"],
+    "excludeNames": ["GRUZ"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "system.other-caches",
+    "category": "apps",
+    "app": "Various",
+    "title": "Other app caches",
+    "description": "Remaining folders in ~/Library/Caches. By macOS convention, this is data that apps can recreate; quit an app before removing its cache.",
+    "regeneration": "The app recreates its cache on launch.",
+    "safety": "safe",
+    "paths": ["~/Library/Caches/*"],
+    "excludeNames": ["com.apple.*", "CloudKit", "FamilyCircle", "com.apple.HomeKit", "com.apple.containermanagerd", "com.apple.ap.adprivacyd", "com.apple.homed", "com.apple.findmy.fmipcore", "com.apple.nsurlsessiond"],
+    "group": true,
+    "action": { "type": "trash" }
+  },
+  {
+    "id": "system.trash",
+    "category": "system",
+    "app": "Finder",
+    "title": "Trash",
+    "description": "Files moved to the Trash, including by GRUZ. Space is freed only after you empty the Trash in Finder. Requires Full Disk Access to measure the size.",
+    "safety": "userData",
+    "paths": ["~/.Trash"]
+  }
+]

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld dni</string>
+			<key>many</key>
+			<string>%lld dni</string>
+			<key>one</key>
+			<string>%lld dzień</string>
+			<key>other</key>
+			<string>%lld dnia</string>
+		</dict>
+	</dict>
+	<key>%lld items will be deleted permanently, bypassing the Trash. This cannot be undone.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld pozycje zostaną usunięte trwale, z pominięciem Kosza. Tego nie da się cofnąć.</string>
+			<key>many</key>
+			<string>%lld pozycji zostanie usuniętych trwale, z pominięciem Kosza. Tego nie da się cofnąć.</string>
+			<key>one</key>
+			<string>%lld pozycja zostanie usunięta trwale, z pominięciem Kosza. Tego nie da się cofnąć.</string>
+			<key>other</key>
+			<string>%lld pozycji zostanie usunięte trwale, z pominięciem Kosza. Tego nie da się cofnąć.</string>
+		</dict>
+	</dict>
+	<key>%lld items will be skipped (reasons are in the list).</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld pozycje zostaną pominięte (powody na liście).</string>
+			<key>many</key>
+			<string>%lld pozycji zostanie pominiętych (powody na liście).</string>
+			<key>one</key>
+			<string>%lld pozycja zostanie pominięta (powód na liście).</string>
+			<key>other</key>
+			<string>%lld pozycji zostanie pominięte (powody na liście).</string>
+		</dict>
+	</dict>
+	<key>%lld items. Expand the group in the list to select individual items.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld pozycje. Rozwiń grupę na liście, żeby zaznaczyć wybrane.</string>
+			<key>many</key>
+			<string>%lld pozycji. Rozwiń grupę na liście, żeby zaznaczyć wybrane.</string>
+			<key>one</key>
+			<string>%lld pozycja. Rozwiń grupę na liście, żeby ją zaznaczyć.</string>
+			<key>other</key>
+			<string>%lld pozycji. Rozwiń grupę na liście, żeby zaznaczyć wybrane.</string>
+		</dict>
+	</dict>
+	<key>(%lld items)</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>(%lld pozycje)</string>
+			<key>many</key>
+			<string>(%lld pozycji)</string>
+			<key>one</key>
+			<string>(%lld pozycja)</string>
+			<key>other</key>
+			<string>(%lld pozycji)</string>
+		</dict>
+	</dict>
+	<key>Only data older than %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Tylko dane starsze niż %lld dni</string>
+			<key>many</key>
+			<string>Tylko dane starsze niż %lld dni</string>
+			<key>one</key>
+			<string>Tylko dane starsze niż %lld dzień</string>
+			<key>other</key>
+			<string>Tylko dane starsze niż %lld dnia</string>
+		</dict>
+	</dict>
+	<key>Shown only if the data has not changed for %lld days.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Pokazywane tylko, jeśli dane nie zmieniły się od %lld dni.</string>
+			<key>many</key>
+			<string>Pokazywane tylko, jeśli dane nie zmieniły się od %lld dni.</string>
+			<key>one</key>
+			<string>Pokazywane tylko, jeśli dane nie zmieniły się od %lld dnia.</string>
+			<key>other</key>
+			<string>Pokazywane tylko, jeśli dane nie zmieniły się od %lld dnia.</string>
+		</dict>
+	</dict>
+	<key>Skipped %lld records from other devices. Delete them on the source device.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Pominięto %lld rekordy z innych urządzeń. Usuń je na urządzeniu źródłowym.</string>
+			<key>many</key>
+			<string>Pominięto %lld rekordów z innych urządzeń. Usuń je na urządzeniu źródłowym.</string>
+			<key>one</key>
+			<string>Pominięto %lld rekord z innego urządzenia. Usuń go na urządzeniu źródłowym.</string>
+			<key>other</key>
+			<string>Pominięto %lld rekordu z innych urządzeń. Usuń je na urządzeniu źródłowym.</string>
+		</dict>
+	</dict>
+	<key>The remaining %lld items will be moved to the Trash.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Pozostałe %lld pozycje trafią do Kosza.</string>
+			<key>many</key>
+			<string>Pozostałych %lld pozycji trafi do Kosza.</string>
+			<key>one</key>
+			<string>Pozostała %lld pozycja trafi do Kosza.</string>
+			<key>other</key>
+			<string>Pozostałe %lld pozycji trafi do Kosza.</string>
+		</dict>
+	</dict>
+	<key>Total: **%@** in %lld items</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Razem: **%@** w %#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld pozycjach</string>
+			<key>many</key>
+			<string>%lld pozycjach</string>
+			<key>one</key>
+			<string>%lld pozycji</string>
+			<key>other</key>
+			<string>%lld pozycji</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

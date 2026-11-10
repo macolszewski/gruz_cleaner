@@ -1,0 +1,105 @@
+/* Match the GRUZ icon: charcoal body, yellow blade, red eyes. */
+:root {
+  --gruz-yellow: #f2b705;
+  --gruz-yellow-dark: #c99600;
+  --gruz-charcoal: #2b2b30;
+  --gruz-charcoal-dark: #1f1f23;
+  --gruz-red: #e5262e;
+}
+
+/* Light scheme: charcoal header, yellow only where it stays readable (on charcoal or as a fill). */
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #2b2b30;
+  --md-primary-fg-color--light: #3a3a40;
+  --md-primary-fg-color--dark: #1f1f23;
+  --md-primary-bg-color: #f4f4f5;
+  --md-primary-bg-color--light: #a9a9b0;
+  --md-accent-fg-color: #c41e25;
+  --md-accent-fg-color--transparent: rgba(196, 30, 37, 0.1);
+  --md-typeset-a-color: #7a5a00;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 240;
+  --md-default-bg-color: #1c1c20;
+  --md-primary-fg-color: #2b2b30;
+  --md-primary-fg-color--light: #3a3a40;
+  --md-primary-fg-color--dark: #1f1f23;
+  --md-primary-bg-color: #f4f4f5;
+  --md-primary-bg-color--light: #a9a9b0;
+  --md-accent-fg-color: #ffcf3d;
+  --md-accent-fg-color--transparent: rgba(255, 207, 61, 0.1);
+  --md-typeset-a-color: #f2b705;
+}
+
+.md-header,
+.md-tabs {
+  box-shadow: none;
+}
+
+/* A yellow edge under the header, like the blade under the body. */
+.md-tabs {
+  border-bottom: 3px solid var(--gruz-yellow);
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: var(--gruz-yellow);
+}
+
+.md-typeset img {
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+.md-typeset kbd {
+  font-family: var(--md-code-font-family);
+}
+
+/* Landing page hero. */
+.gruz-hero {
+  text-align: center;
+  margin: 1rem 0 2rem;
+}
+
+.gruz-hero img.gruz-logo {
+  width: 112px;
+  box-shadow: none;
+}
+
+.gruz-hero .tagline {
+  font-size: 1.15rem;
+  opacity: 0.85;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.gruz-hero .expansion {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--gruz-yellow);
+  border-color: var(--gruz-yellow);
+  color: var(--gruz-charcoal);
+}
+
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: var(--gruz-yellow-dark);
+  border-color: var(--gruz-yellow-dark);
+  color: var(--gruz-charcoal-dark);
+}
+
+.md-typeset .md-button:not(.md-button--primary) {
+  color: var(--md-typeset-a-color);
+  border-color: currentColor;
+}
+
+/* Feature cards: a thin yellow top edge. */
+.md-typeset .grid.cards > ul > li {
+  border-top: 3px solid var(--gruz-yellow);
+}

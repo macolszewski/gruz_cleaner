@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld day</string>
+			<key>other</key>
+			<string>%lld days</string>
+		</dict>
+	</dict>
+	<key>%lld items will be deleted permanently, bypassing the Trash. This cannot be undone.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item will be deleted permanently, bypassing the Trash. This cannot be undone.</string>
+			<key>other</key>
+			<string>%lld items will be deleted permanently, bypassing the Trash. This cannot be undone.</string>
+		</dict>
+	</dict>
+	<key>%lld items will be skipped (reasons are in the list).</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item will be skipped (the reason is in the list).</string>
+			<key>other</key>
+			<string>%lld items will be skipped (reasons are in the list).</string>
+		</dict>
+	</dict>
+	<key>%lld items. Expand the group in the list to select individual items.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item. Expand the group in the list to select it.</string>
+			<key>other</key>
+			<string>%lld items. Expand the group in the list to select individual items.</string>
+		</dict>
+	</dict>
+	<key>(%lld items)</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>(%lld item)</string>
+			<key>other</key>
+			<string>(%lld items)</string>
+		</dict>
+	</dict>
+	<key>Only data older than %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Only data older than %lld day</string>
+			<key>other</key>
+			<string>Only data older than %lld days</string>
+		</dict>
+	</dict>
+	<key>Shown only if the data has not changed for %lld days.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Shown only if the data has not changed for %lld day.</string>
+			<key>other</key>
+			<string>Shown only if the data has not changed for %lld days.</string>
+		</dict>
+	</dict>
+	<key>Skipped %lld records from other devices. Delete them on the source device.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Skipped %lld record from another device. Delete it on the source device.</string>
+			<key>other</key>
+			<string>Skipped %lld records from other devices. Delete them on the source device.</string>
+		</dict>
+	</dict>
+	<key>The remaining %lld items will be moved to the Trash.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>The remaining %lld item will be moved to the Trash.</string>
+			<key>other</key>
+			<string>The remaining %lld items will be moved to the Trash.</string>
+		</dict>
+	</dict>
+	<key>Total: **%@** in %lld items</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Total: **%@** in %#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item</string>
+			<key>other</key>
+			<string>%lld items</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

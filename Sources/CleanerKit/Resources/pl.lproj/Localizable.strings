@@ -1,0 +1,77 @@
+/* Polish translations. Keys are the English source strings; see scripts/check-localizations.py.
+   Counted texts are in Localizable.stringsdict. */
+
+/* Review sheet and cleaning results */
+"Quit %@ first" = "Zamknij: %@";
+"No paths to remove" = "Brak ścieżek";
+"The command is not on the allow list" = "Polecenie spoza listy dozwolonych";
+"Cannot find %@" = "Nie znaleziono programu %@";
+"The plan was not confirmed" = "Plan nie został zatwierdzony";
+"Permanent deletion was not confirmed" = "Trwałe usunięcie nie zostało potwierdzone";
+"no longer exists" = "już nie istnieje";
+"Exit code %lld" = "Kod wyjścia %lld";
+"Could not save the disk usage history: %@" = "Nie udało się zapisać historii zajętości: %@";
+
+/* Rust artifacts */
+"The Rust artifact no longer matches the scan. Scan again." = "Zmienił się kontekst artefaktu Rust. Wykonaj nowy skan.";
+"Cannot open the existing Cargo lock. Cleaning stopped." = "Nie można otworzyć istniejącej blokady Cargo. Czyszczenie wstrzymane.";
+"Cargo is using this profile. Wait for the build to finish and try again." = "Cargo korzysta z tego profilu. Zakończ kompilację i spróbuj ponownie.";
+"Cargo, the Rust compiler, rust-analyzer or a debugger is running. Quit these tools before cleaning." = "Działa Cargo, kompilator, analizator Rust lub debugger. Zakończ pracę tych narzędzi przed czyszczeniem.";
+"A program or test built in this profile is running. Quit it first." = "Działa program lub test z tego profilu. Najpierw go zamknij.";
+"The artifacts changed since the scan. Scan again before removing them." = "Artefakty zmieniły się od skanu. Wykonaj nowy skan przed usunięciem.";
+"The Cargo lock file was replaced. Scan again." = "Plik blokady Cargo został podmieniony. Wykonaj nowy skan.";
+"Could not check running processes. Cleaning stopped." = "Nie udało się sprawdzić aktywnych procesów. Czyszczenie wstrzymane.";
+
+/* AI memory (claude-mem) maintenance */
+"The operation was not confirmed, or another cleanup is already running." = "Operacja nie została zatwierdzona albo trwa już inne czyszczenie.";
+"Checking the worker and whether the preview is current…" = "Sprawdzanie workera i aktualności podglądu…";
+"Another GRUZ instance is maintaining this database." = "Inna instancja Cleanera prowadzi konserwację tej bazy.";
+"Maintenance was interrupted. Choose “Rebuild Indexes” first." = "Po przerwaniu konserwacji najpierw wybierz „Odbuduj indeksy”.";
+"The data changed since the preview. Refresh the list and confirm the new scope." = "Dane zmieniły się od podglądu. Odśwież listę i zatwierdź nowy zakres.";
+"Nothing to remove in this scope." = "Brak danych do usunięcia w tym zakresie.";
+"Preparing the local indexing model (the first run may download dependencies)…" = "Przygotowanie lokalnego modelu indeksowania (pierwsze uruchomienie może pobrać zależności)…";
+"Removing memories: %lld of %lld…" = "Usuwanie pamięci: %lld z %lld…";
+"A record changed since the preview. Refresh the scope before removing more." = "Rekord zmienił się od podglądu. Odśwież zakres przed dalszym usuwaniem.";
+"Stopping the worker while the indexes are rebuilt…" = "Zatrzymywanie workera na czas przebudowy indeksów…";
+"Local files or the tool history changed. Preview again after the indexes are rebuilt." = "Lokalne pliki lub historia narzędzi zmieniły się. Ponów podgląd po odbudowie indeksów.";
+"Rebuilding text indexes and compacting SQLite…" = "Odbudowa indeksów tekstowych i porządkowanie SQLite…";
+"The SQLite integrity check failed. The database backup is kept." = "Kontrola integralności SQLite nie powiodła się. Kopia bazy jest zachowana.";
+"Rebuilding Chroma from the remaining data. This can take a few minutes…" = "Pełna odbudowa Chroma z pozostałych danych. To może potrwać kilka minut…";
+"Checking the index kept from the interrupted maintenance…" = "Sprawdzanie indeksu zachowanego po przerwaniu konserwacji…";
+"Restarting claude-mem…" = "Ponowne uruchamianie claude-mem…";
+"The worker was restarted." = "Worker został ponownie uruchomiony.";
+"The worker is still stopped. Use “Rebuild Indexes” to finish maintenance." = "Worker pozostał zatrzymany. Użyj „Odbuduj indeksy”, aby dokończyć konserwację.";
+"The data location is unsafe or does not exist." = "Niebezpieczna lub nieistniejąca lokalizacja danych.";
+"Cleaning does not support symbolic links for the database and index files." = "Czyszczenie nie obsługuje dowiązań dla plików bazy i indeksu.";
+"The new index is incomplete." = "Nowy indeks jest niekompletny.";
+
+/* claude-mem database */
+"Cannot open the database for maintenance." = "Nie można otworzyć bazy do konserwacji.";
+"Cannot create a backup of the database." = "Nie można utworzyć kopii bazy.";
+"Cannot start a consistent SQLite backup." = "Nie można rozpocząć spójnej kopii SQLite.";
+"The SQLite backup did not complete. No data was removed." = "Kopia SQLite nie została ukończona. Nie usunięto danych.";
+"Direct deletion is allowed only for the local tool history." = "Bezpośrednie kasowanie jest dozwolone tylko dla lokalnej historii narzędzi.";
+"The tool history changed. Refresh the preview." = "Historia narzędzi zmieniła się. Odśwież podgląd.";
+"Unrecognized FTS index." = "Nierozpoznany indeks FTS.";
+
+/* claude-mem worker and indexing helper */
+"Invalid worker address." = "Nieprawidłowy adres workera.";
+"The worker rejected %@ /api/%@ (HTTP %lld). Check the state of claude-mem and do not force anything." = "Worker odrzucił %@ /api/%@ (HTTP %lld). Sprawdź stan claude-mem; niczego nie wymuszaj.";
+"Start claude-mem so GRUZ can confirm the database location and manage the worker safely." = "Uruchom claude-mem, aby GRUZ mógł potwierdzić lokalizację bazy i bezpiecznie zarządzać workerem.";
+"The worker does not serve this database or is still starting." = "Worker nie obsługuje wskazanej bazy albo jeszcze się uruchamia.";
+"GRUZ supports claude-mem 13.x from version 13.28.0. Found version %@." = "Obsługiwana jest linia claude-mem 13.x od 13.28.0. Wykryto %@.";
+"The worker start script is missing." = "Brak skryptu uruchomieniowego workera.";
+"claude-mem has active sessions or queued work. End the agent sessions that use memory, then try again." = "claude-mem ma aktywne sesje lub kolejkę. Zakończ sesje agentów korzystających z pamięci, a potem spróbuj ponownie.";
+"This record cannot be deleted through the worker." = "Tego rekordu nie można usunąć przez workera.";
+"The worker did not confirm the deletion." = "Worker nie potwierdził usunięcia.";
+"The worker or Chroma still has files open. Maintenance was stopped." = "Worker lub Chroma nadal trzyma pliki otwarte. Konserwacja została przerwana.";
+"The worker is running. Quit the claude-mem clients and try again." = "Worker jest uruchomiony. Zamknij klientów claude-mem i ponów operację.";
+"claude-mem files are open, or GRUZ cannot check that. Quit the clients and try again." = "Pliki claude-mem są otwarte lub nie można tego sprawdzić. Zamknij klientów i ponów operację.";
+"Cannot find Bun, which is needed to restart claude-mem." = "Nie znaleziono Bun potrzebnego do ponownego uruchomienia claude-mem.";
+"uv or the indexing script is missing. Install uv and rebuild GRUZ." = "Brak uv lub skryptu indeksowania. Zainstaluj uv i przebuduj GRUZ.";
+"A full rebuild supports only a local Chroma with the default embedding model. A remote or custom index needs separate handling." = "Pełna przebudowa obsługuje lokalną Chromę z domyślnym modelem embeddingów. Zdalny lub niestandardowy indeks wymaga osobnej obsługi.";
+"Could not prepare indexing: %@" = "Nie udało się przygotować indeksowania: %@";
+"Rebuilding Chroma failed: %@" = "Przebudowa Chroma nie powiodła się: %@";
+"The preserved index does not match the database: %@" = "Zachowany indeks nie odpowiada bazie: %@";
+"Could not start claude-mem: %@" = "Nie udało się uruchomić claude-mem: %@";
+"The worker did not report that it is ready after starting." = "Worker nie potwierdził gotowości po uruchomieniu.";

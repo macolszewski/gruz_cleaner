@@ -1,0 +1,126 @@
+/* Polish translations. Keys are the English source strings; see scripts/check-localizations.py.
+   Plural forms are in Localizable.stringsdict. */
+
+/* Safety levels */
+"Safe" = "Bezpieczne";
+"Regenerable" = "Do odtworzenia";
+"Caution" = "Uwaga";
+"User data" = "Dane użytkownika";
+"A cache the app recreates on its own. Removing it costs at most a new download or a slower first launch." = "Cache, który program sam odtworzy. Usunięcie kosztuje co najwyżej ponowne pobranie lub wolniejszy pierwszy start.";
+"Build artifacts or dependencies. They can be recreated, but that takes a project build, an install or a download." = "Artefakty budowania lub zależności. Da się je odtworzyć, ale wymaga to zbudowania projektu, instalacji lub pobrania danych.";
+"May contain data that cannot be recreated (databases, sessions, settings). Remove it only if you know what it is." = "Mogą tu być dane, których nie da się odtworzyć (bazy, sesje, ustawienia). Usuń tylko, jeśli wiesz, co to jest.";
+"Your data. It is shown for information only and cannot be removed with GRUZ." = "Twoje dane. Pozycja jest widoczna tylko informacyjnie i nie da się jej usunąć z aplikacji.";
+
+/* Categories and scan stages */
+"Docker and OrbStack" = "Docker i OrbStack";
+"Package managers" = "Menedżery pakietów";
+"Projects" = "Projekty";
+"Rust and Cargo" = "Rust i Cargo";
+"Xcode and simulators" = "Xcode i symulatory";
+"AI tools" = "Narzędzia AI";
+"App caches" = "Cache aplikacji";
+"Browsers" = "Przeglądarki";
+"System and logs" = "System i logi";
+"App leftovers" = "Pozostałości po aplikacjach";
+"Applications" = "Programy";
+"Unrecognized" = "Nierozpoznane";
+"Known locations" = "Znane lokalizacje";
+"Simulators" = "Symulatory";
+
+/* Denylist */
+"The path is not absolute" = "Ścieżka nie jest bezwzględna";
+"Git repositories are protected" = "Repozytoria Git są chronione";
+"Protected folder" = "Katalog chroniony";
+"Protected area" = "Obszar chroniony";
+"Protected area: %@" = "Obszar chroniony: %@";
+"Outside the allowed area" = "Poza dozwolonym obszarem";
+"A symbolic link leads to a protected location: %@" = "Dowiązanie prowadzi do chronionego miejsca: %@";
+"Git repository" = "Repozytorium Git";
+
+/* Docker */
+"OrbStack virtual machine disk image" = "Obraz dysku maszyny wirtualnej OrbStack";
+"Docker Desktop data" = "Dane Docker Desktop";
+"A single disk image file that holds all containers, images, volumes and Linux machines. The items above are part of it. It is not removed as a file: removing images and volumes frees space inside it, and %@ returns that space to macOS automatically." = "Jeden plik-obraz dysku, w którym są wszystkie kontenery, obrazy, wolumeny i maszyny Linux. Pozycje powyżej są jego częścią. Nie usuwa się go jako pliku; miejsce zwalnia się, usuwając obrazy i wolumeny, a %@ oddaje je do macOS automatycznie.";
+"Docker: could not read data (%@). Is OrbStack running?" = "Docker: nie udało się odczytać danych (%@). Czy OrbStack działa?";
+"Docker is not responding: %@. Start OrbStack to see images and volumes." = "Docker nie odpowiada: %@. Uruchom OrbStack, żeby zobaczyć obrazy i wolumeny.";
+"Docker: unrecognized response format." = "Docker: nieznany format odpowiedzi.";
+"<unnamed> %@" = "<bez nazwy> %@";
+"A Docker image that no container uses. The size counts only its unique part; layers shared with other images stay." = "Obraz Dockera, z którego nie korzysta żaden kontener. Rozmiar to część unikalna; warstwy współdzielone z innymi obrazami zostają.";
+"Pull it again (docker pull) or build it (docker build)." = "Pobierz ponownie (docker pull) albo zbuduj (docker build).";
+"Full image size: %@" = "Pełny rozmiar obrazu: %@";
+"Images without containers" = "Obrazy bez kontenera";
+"Docker images that no container uses: old project builds and base images." = "Obrazy Dockera, z których nie korzysta żaden kontener: stare buildy projektów i obrazy bazowe.";
+"Stopped container (image %@). Removing it loses changes written to its file system but does not touch volumes." = "Zatrzymany kontener (obraz %@). Usunięcie traci zmiany zapisane w jego systemie plików, ale nie dotyka wolumenów.";
+"Stopped containers" = "Zatrzymane kontenery";
+"Containers that are not running." = "Kontenery, które nie działają.";
+"An unnamed volume not attached to any container. Usually left over from docker run or compose down without -v, but it may hold test database data." = "Wolumen bez nazwy, niepodłączony do żadnego kontenera. Zwykle pozostałość po docker run lub compose down bez -v, ale może zawierać dane testowej bazy.";
+"The contents cannot be restored; the container will create a new, empty volume." = "Nie da się odtworzyć zawartości; kontener utworzy nowy, pusty wolumen.";
+"Anonymous volumes without containers" = "Wolumeny anonimowe bez kontenera";
+"Volumes with random names, not attached to any container." = "Wolumeny z losową nazwą, niepodłączone do żadnego kontenera.";
+"A named volume not attached to any container right now. Such volumes usually hold databases and project files; having no container does not mean they are no longer needed." = "Wolumen nazwany, niepodłączony teraz do żadnego kontenera. Takie wolumeny zwykle przechowują bazy danych i pliki projektów; brak kontenera nie oznacza, że są zbędne.";
+"The contents cannot be restored without a backup." = "Zawartości nie da się odtworzyć bez kopii zapasowej.";
+"docker compose project: %@" = "Projekt docker compose: %@";
+"Named volumes without containers (databases)" = "Wolumeny nazwane bez kontenera (bazy danych)";
+"Named volumes without a container. Check each one before removing it." = "Nazwane wolumeny bez kontenera. Sprawdź każdy przed usunięciem.";
+"Build cache (BuildKit)" = "Cache budowania (BuildKit)";
+"Unused, unshared docker build layers. The size is an estimate; the command may reclaim less. Project data is not affected." = "Nieużywane, niewspółdzielone warstwy docker build. Rozmiar jest szacunkiem; polecenie może odzyskać mniej. Dane projektów nie ucierpią.";
+"Rebuilt by later builds, which will be slower." = "Odtwarza się przy kolejnych buildach, które będą wolniejsze.";
+
+/* Simulators */
+"Simulators: could not read the device list (xcrun simctl)." = "Symulatory: nie udało się odczytać listy (xcrun simctl).";
+"A simulator with the apps installed in it and their data. Removing it deletes the device; Xcode will create a new, empty one." = "Symulator wraz z zainstalowanymi w nim aplikacjami i ich danymi. Usunięcie kasuje urządzenie; Xcode utworzy nowe, puste.";
+"A simulator for a runtime that is no longer installed. It cannot be started." = "Symulator dla środowiska, którego nie ma już w systemie. Nie da się go uruchomić.";
+"Add the device again in Xcode > Window > Devices and Simulators." = "Xcode > Window > Devices and Simulators pozwala dodać urządzenie ponownie.";
+"The simulator is running" = "Symulator jest uruchomiony";
+"iOS simulators" = "Symulatory iOS";
+"Simulator devices with their data." = "Urządzenia symulatora z ich danymi.";
+
+/* App leftovers, applications, unrecognized folders */
+"App not found" = "Nie znaleziono programu";
+"Data of the app with identifier %@ (%@). No app with this identifier is installed, so it is most likely left over from an uninstalled app." = "Dane programu o identyfikatorze %@ (%@). W systemie nie ma zainstalowanej aplikacji o tym identyfikatorze, więc to najpewniej pozostałość po odinstalowanym programie.";
+"If you install the app again, it will start with default settings." = "Jeśli zainstalujesz program ponownie, zacznie od czystych ustawień.";
+"An app installed in %@. GRUZ does not remove apps; uninstall it in the Finder, with Homebrew or with JetBrains Toolbox." = "Program zainstalowany w %@. Usuwanie programów nie jest obsługiwane przez GRUZ; odinstaluj go w Finderze, przez Homebrew lub JetBrains Toolbox.";
+"Excludes subfolders described in other categories" = "Bez podkatalogów opisanych w innych kategoriach";
+"No rule in the catalog describes this folder, so GRUZ cannot tell whether it is safe to remove. It is shown for information only." = "Ten katalog nie jest opisany w katalogu reguł, więc GRUZ nie wie, czy można go bezpiecznie usunąć. Pozycja jest widoczna tylko informacyjnie.";
+
+/* Projects */
+"Rust: some folders need manual review: %@" = "Rust: część katalogów wymaga ręcznego przeglądu: %@";
+"Could not check the Git status" = "Nie udało się sprawdzić stanu Git";
+"Git: no uncommitted changes" = "Git: brak niezacommitowanych zmian";
+
+/* Rust */
+"The folder is gone or is a symbolic link. Scan again." = "Katalog zniknął lub jest dowiązaniem. Wykonaj nowy skan.";
+"The folder cannot be read." = "Nie można odczytać katalogu.";
+"Measurement canceled." = "Pomiar anulowany.";
+"Incomplete measurement: a link or special file was found. Review it manually." = "Niepełny pomiar, dowiązanie lub plik specjalny. Wymagany ręczny przegląd.";
+"The folder spans another volume." = "Katalog obejmuje inny wolumin.";
+"Data or an app bundle was found. GRUZ will not remove this subfolder." = "Znaleziono dane lub pakiet aplikacji. GRUZ nie usunie tego podkatalogu.";
+"Build artifacts of the %@ profile. Removal does not touch sources, other profiles or built apps outside this subfolder." = "Artefakty kompilacji profilu %@. Usunięcie nie obejmuje źródeł, innych profili ani gotowych aplikacji poza tym podkatalogiem.";
+"Cargo recreates the files on the next build or test run. The first run will be slower." = "Cargo odtworzy pliki przy następnym buildzie lub testach. Pierwsze uruchomienie będzie wolniejsze.";
+"Estimated size; shared blocks may reduce the reclaimed space. Before removal, GRUZ checks running processes, the Cargo lock and changes since the scan." = "Szacunek zajętości; współdzielone bloki mogą zmniejszyć odzysk. Przed usunięciem GRUZ sprawdza procesy, blokadę Cargo i zmiany od skanu.";
+"Kept: %@" = "Zachowane: %@";
+"Build output or other profile contents. Not included in Rust cache cleanup." = "Gotowy wynik lub inna zawartość profilu. Nie jest objęta czyszczeniem cache Rust.";
+"Debug and tests (release is kept)" = "Debug i testy (release zostaje)";
+"Profile %@" = "Profil %@";
+"Selecting the group includes only subfolders with recognized artifacts. Built programs and packages stay on disk." = "Zaznaczenie grupy obejmuje tylko podkatalogi z rozpoznanymi artefaktami. Gotowe programy i pakiety pozostają na dysku.";
+"Unrecognized target layout" = "Nierozpoznany układ target";
+"No recognized profile with a Cargo lock and a .fingerprint folder. Cleaning is disabled." = "Brak rozpoznanego profilu z blokadą Cargo i katalogiem .fingerprint. Czyszczenie wyłączone.";
+"Build profiles and caches. Debug can be cleaned separately while keeping release. Space is freed only after the Trash is emptied." = "Profile i cache kompilacji. Debug można wyczyścić osobno, zachowując release. Kosz zwolni miejsce dopiero po opróżnieniu.";
+
+/* AI memory (claude-mem) */
+"Observations" = "Obserwacje";
+"Session summaries" = "Podsumowania sesji";
+"User prompts" = "Prompty użytkownika";
+"Tool call history" = "Historia wywołań narzędzi";
+"Diagnostic logs" = "Logi diagnostyczne";
+"Observer session files" = "Pliki sesji obserwatora";
+"Older than" = "Starsze niż";
+"Since (inclusive)" = "Od dnia (włącznie)";
+"Invalid claude-mem port." = "Nieprawidłowy port claude-mem.";
+"Cannot read the claude-mem database: %@" = "Nie można odczytać bazy claude-mem: %@";
+"Unrecognized claude-mem database schema. Cleaning is blocked." = "Nierozpoznany schemat bazy claude-mem. Czyszczenie jest zablokowane.";
+"The scanner allows read-only SQL only." = "Skaner dopuszcza wyłącznie odczyt SQL.";
+"Invalid date." = "Nieprawidłowa data.";
+"A record has an invalid identifier or date." = "Rekord ma nieprawidłowy identyfikator lub datę.";
+"SQLite read error: %@" = "Błąd odczytu SQLite: %@";
+"no connection" = "brak połączenia";

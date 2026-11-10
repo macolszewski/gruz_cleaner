@@ -1,0 +1,30 @@
+# Build products
+/.build/
+/build/
+/.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcresult
+
+# Documentation site (mkdocs build) and its virtual environment
+/site/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Local tooling, agent settings and private notes (never published)
+/.claude/
+/.gitnexus/
+/.rtk/
+/.local/
+CLAUDE.local.md

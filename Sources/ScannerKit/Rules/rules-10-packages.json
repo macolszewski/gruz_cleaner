@@ -1,0 +1,472 @@
+[
+  {
+    "id": "uv.cache",
+    "category": "packages",
+    "app": "uv (Python)",
+    "title": "Python package cache (uv)",
+    "description": "Downloaded and unpacked Python packages that uv uses to build .venv environments. On APFS, uv clones files into .venv, so less space is actually freed than the size shows.",
+    "regeneration": "uv downloads the packages again on the next install.",
+    "safety": "safe",
+    "paths": [
+      "~/.cache/uv"
+    ],
+    "action": {
+      "type": "command",
+      "argv": [
+        "uv",
+        "cache",
+        "clean"
+      ]
+    },
+    "note": "Runs the official uv cache clean command."
+  },
+  {
+    "id": "npm.cacache",
+    "category": "packages",
+    "app": "npm",
+    "title": "npm package cache",
+    "description": "Archives of packages downloaded by npm. Project installs reuse them instead of downloading the same package again.",
+    "regeneration": "npm downloads the packages again.",
+    "safety": "safe",
+    "paths": [
+      "~/.npm/_cacache"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "npm.npx",
+    "category": "packages",
+    "app": "npx",
+    "title": "Packages downloaded by npx",
+    "description": "Tools run through npx (including MCP servers). Each subfolder is one download.",
+    "regeneration": "They are downloaded again the next time npx runs them.",
+    "safety": "safe",
+    "paths": [
+      "~/.npm/_npx/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "defaultAgeDays": 30
+  },
+  {
+    "id": "npm.logs",
+    "category": "packages",
+    "app": "npm",
+    "title": "npm logs",
+    "description": "npm error and debug logs.",
+    "safety": "safe",
+    "paths": [
+      "~/.npm/_logs"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "gradle.caches",
+    "category": "packages",
+    "app": "Gradle",
+    "title": "Gradle cache",
+    "description": "Downloaded Maven/Gradle dependencies and library transforms (Android, Flutter, Kotlin).",
+    "regeneration": "The next build downloads the dependencies again; the first build will be slow.",
+    "safety": "safe",
+    "paths": [
+      "~/.gradle/caches"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "gradle.wrapper",
+    "category": "packages",
+    "app": "Gradle",
+    "title": "Downloaded Gradle distributions",
+    "description": "Gradle versions downloaded by gradlew in projects. Each subfolder is one version.",
+    "regeneration": "gradlew downloads the required version on the next build.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.gradle/wrapper/dists/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "gradle.tmp",
+    "category": "packages",
+    "app": "Gradle",
+    "title": "Gradle temporary files and daemon logs",
+    "description": "Temporary files and logs of Gradle daemon processes.",
+    "safety": "safe",
+    "paths": [
+      "~/.gradle/.tmp",
+      "~/.gradle/daemon"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "homebrew.cache",
+    "category": "packages",
+    "app": "Homebrew",
+    "title": "Homebrew download cache",
+    "description": "Downloaded bottles and installers of Homebrew packages. Installed programs do not use them.",
+    "regeneration": "Homebrew downloads the files again when installing or upgrading.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/Homebrew"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "pip.cache",
+    "category": "packages",
+    "app": "pip",
+    "title": "pip cache",
+    "description": "Packages downloaded and wheels built by pip.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/pip"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "python.cache",
+    "category": "packages",
+    "app": "Python",
+    "title": "System Python cache",
+    "description": "Compiled .pyc files of the Python that ships with macOS and the Xcode tools.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/com.apple.python"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "playwright.old",
+    "category": "packages",
+    "app": "Playwright",
+    "title": "Old Playwright browser versions",
+    "description": "Playwright downloads browsers separately for each of its versions. These are older versions of Chromium, WebKit and ffmpeg; the newest of each kind is kept.",
+    "regeneration": "npx playwright install downloads the required version.",
+    "safety": "safe",
+    "kind": "versions",
+    "paths": [
+      "~/Library/Caches/ms-playwright"
+    ],
+    "versionPattern": "^(?<name>.+)-(?<version>[0-9]+)$",
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "playwright.current",
+    "category": "packages",
+    "app": "Playwright",
+    "title": "Current Playwright browsers",
+    "description": "The newest browser versions downloaded by Playwright, used by end-to-end tests and automation tools (including MCP servers).",
+    "regeneration": "npx playwright install.",
+    "safety": "regenerable",
+    "paths": [
+      "~/Library/Caches/ms-playwright/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "puppeteer.cache",
+    "category": "packages",
+    "app": "Puppeteer",
+    "title": "Puppeteer browsers",
+    "description": "Chromium and Chrome downloaded by Puppeteer.",
+    "regeneration": "They are downloaded again when the puppeteer package is installed.",
+    "safety": "safe",
+    "paths": [
+      "~/.cache/puppeteer"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "bun.cache",
+    "category": "packages",
+    "app": "Bun",
+    "title": "Bun install cache",
+    "description": "Packages downloaded by bun install.",
+    "safety": "safe",
+    "paths": [
+      "~/.bun/install/cache"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "yarn.cache",
+    "category": "packages",
+    "app": "Yarn",
+    "title": "Yarn cache",
+    "description": "Packages downloaded by Yarn.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/Yarn",
+      "~/.yarn/berry/cache"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "pnpm.store",
+    "category": "packages",
+    "app": "pnpm",
+    "title": "pnpm package store",
+    "description": "The shared pnpm package store; projects link to it with hard links.",
+    "regeneration": "pnpm install downloads the packages again.",
+    "safety": "regenerable",
+    "paths": [
+      "~/Library/pnpm/store"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "nuget.packages",
+    "category": "packages",
+    "app": ".NET / NuGet",
+    "title": "NuGet packages",
+    "description": "Downloaded .NET packages used by projects (Rider, dotnet build).",
+    "regeneration": "dotnet restore downloads them again.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.nuget/packages"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "nuget.http-cache",
+    "category": "packages",
+    "app": ".NET / NuGet",
+    "title": "NuGet HTTP cache",
+    "description": "NuGet server responses saved during restore.",
+    "safety": "safe",
+    "paths": [
+      "~/.local/share/NuGet/http-cache",
+      "~/.local/share/NuGet/v3-cache"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "pub.cache",
+    "category": "packages",
+    "app": "Dart / Flutter",
+    "title": "Dart packages (pub)",
+    "description": "Packages downloaded from pub.dev for Flutter and Dart projects.",
+    "regeneration": "flutter pub get downloads them again.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.pub-cache/hosted"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "dart.analysis",
+    "category": "packages",
+    "app": "Dart",
+    "title": "Dart analyzer cache",
+    "description": "Code analysis results of the Dart language server (IDE suggestions).",
+    "regeneration": "Rebuilt when the project is opened in an IDE.",
+    "safety": "safe",
+    "paths": [
+      "~/.dartServer/.analysis-driver"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "fvm.old",
+    "category": "packages",
+    "app": "FVM (Flutter)",
+    "title": "Old Flutter SDK versions (FVM)",
+    "description": "Flutter versions installed by FVM, except the newest. Projects pinned to an older version will not build until you install it again.",
+    "regeneration": "fvm install <version>.",
+    "safety": "regenerable",
+    "kind": "versions",
+    "paths": [
+      "~/fvm/versions"
+    ],
+    "versionPattern": "^(?<version>[0-9][0-9.]*)$",
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "nvm.old",
+    "category": "packages",
+    "app": "nvm (Node.js)",
+    "title": "Old Node.js versions (nvm)",
+    "description": "Node.js versions installed by nvm, except the newest, together with their global packages.",
+    "regeneration": "nvm install <version>.",
+    "safety": "regenerable",
+    "kind": "versions",
+    "paths": [
+      "~/.nvm/versions/node"
+    ],
+    "versionPattern": "^v(?<version>[0-9.]+)$",
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "nvm.cache",
+    "category": "packages",
+    "app": "nvm (Node.js)",
+    "title": "nvm download cache",
+    "description": "Downloaded Node.js installation archives.",
+    "safety": "safe",
+    "paths": [
+      "~/.nvm/.cache"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "cocoapods.cache",
+    "category": "packages",
+    "app": "CocoaPods",
+    "title": "CocoaPods cache",
+    "description": "Downloaded CocoaPods pods and specs.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/CocoaPods"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "swiftpm.cache",
+    "category": "packages",
+    "app": "Swift Package Manager",
+    "title": "Swift Package Manager cache",
+    "description": "Cloned repositories of Swift package dependencies.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/org.swift.swiftpm"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "go.buildcache",
+    "category": "packages",
+    "app": "Go",
+    "title": "Go build cache",
+    "description": "Build results of Go packages.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/go-build"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "cargo.registry",
+    "category": "packages",
+    "app": "Rust / Cargo",
+    "title": "Cargo package registry",
+    "description": "Downloaded and unpacked Rust crates.",
+    "regeneration": "cargo build downloads them again.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.cargo/registry"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "maven.repository",
+    "category": "packages",
+    "app": "Maven",
+    "title": "Local Maven repository",
+    "description": "Downloaded Java libraries.",
+    "regeneration": "mvn downloads them again.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.m2/repository"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "uv.tools",
+    "category": "packages",
+    "app": "uv (Python)",
+    "title": "Tools and Python versions installed by uv",
+    "description": "Python interpreters and command-line tools installed by uv (uv python install, uv tool install). Removing them disables those tools.",
+    "regeneration": "uv tool install / uv python install.",
+    "safety": "caution",
+    "paths": [
+      "~/.local/share/uv/python",
+      "~/.local/share/uv/tools"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "nvm.current",
+    "category": "packages",
+    "app": "nvm (Node.js)",
+    "title": "Installed Node.js (nvm)",
+    "description": "The current Node.js version from nvm, together with globally installed packages.",
+    "safety": "userData",
+    "paths": [
+      "~/.nvm"
+    ]
+  },
+  {
+    "id": "dotnet.sdk",
+    "category": "packages",
+    "app": ".NET",
+    "title": ".NET SDK installed locally",
+    "description": ".NET SDKs and runtimes installed in the home folder by the dotnet-install script.",
+    "safety": "userData",
+    "paths": [
+      "~/.dotnet"
+    ]
+  }
+]

@@ -1,0 +1,495 @@
+{
+  "uv.cache": {
+    "title": "Cache pakietów Pythona (uv)",
+    "description": "Pobrane i rozpakowane paczki Pythona, z których uv tworzy środowiska .venv. Na APFS uv klonuje pliki do .venv, więc realnie zwolni się mniej, niż pokazuje rozmiar.",
+    "regeneration": "uv pobierze paczki ponownie przy następnej instalacji.",
+    "note": "Wykonywane przez oficjalne polecenie uv cache clean."
+  },
+  "npm.cacache": {
+    "title": "Cache paczek npm",
+    "description": "Archiwa paczek pobranych przez npm. Instalacje w projektach korzystają z nich, żeby nie pobierać tego samego drugi raz.",
+    "regeneration": "npm pobierze paczki ponownie."
+  },
+  "npm.npx": {
+    "title": "Paczki pobrane przez npx",
+    "description": "Narzędzia uruchamiane przez npx (m.in. serwery MCP). Każdy podkatalog to jedno pobranie.",
+    "regeneration": "Pobiorą się przy następnym uruchomieniu npx."
+  },
+  "npm.logs": {
+    "title": "Logi npm",
+    "description": "Logi błędów i debugowania npm."
+  },
+  "gradle.caches": {
+    "title": "Cache Gradle",
+    "description": "Pobrane zależności Maven/Gradle i transformacje bibliotek (Android, Flutter, Kotlin).",
+    "regeneration": "Następny build pobierze zależności ponownie; pierwszy build będzie wolny."
+  },
+  "gradle.wrapper": {
+    "title": "Pobrane dystrybucje Gradle",
+    "description": "Wersje Gradle pobrane przez gradlew w projektach. Każdy podkatalog to jedna wersja.",
+    "regeneration": "gradlew pobierze potrzebną wersję przy następnym buildzie."
+  },
+  "gradle.tmp": {
+    "title": "Pliki tymczasowe i logi demona Gradle",
+    "description": "Pliki tymczasowe oraz logi procesów demona Gradle."
+  },
+  "homebrew.cache": {
+    "title": "Cache pobrań Homebrew",
+    "description": "Pobrane butelki (bottles) i instalatory programów Homebrew. Zainstalowane programy z nich nie korzystają.",
+    "regeneration": "Homebrew pobierze pliki ponownie przy instalacji lub aktualizacji."
+  },
+  "pip.cache": {
+    "title": "Cache pip",
+    "description": "Pobrane paczki i zbudowane wheele pip."
+  },
+  "python.cache": {
+    "title": "Cache Pythona systemowego",
+    "description": "Skompilowane pliki .pyc Pythona dostarczanego z macOS i narzędziami Xcode."
+  },
+  "playwright.old": {
+    "title": "Stare wersje przeglądarek Playwright",
+    "description": "Playwright pobiera przeglądarki osobno dla każdej swojej wersji. Tu są starsze wersje Chromium, WebKit i ffmpeg; najnowsza z każdego rodzaju zostaje.",
+    "regeneration": "npx playwright install pobierze potrzebną wersję."
+  },
+  "playwright.current": {
+    "title": "Aktualne przeglądarki Playwright",
+    "description": "Najnowsze wersje przeglądarek pobranych przez Playwright, używane przez testy E2E i narzędzia automatyzacji (m.in. serwery MCP).",
+    "regeneration": "npx playwright install."
+  },
+  "puppeteer.cache": {
+    "title": "Przeglądarki Puppeteer",
+    "description": "Chromium i Chrome pobrane przez Puppeteer.",
+    "regeneration": "Pobiorą się przy instalacji paczki puppeteer."
+  },
+  "bun.cache": {
+    "title": "Cache instalacji Bun",
+    "description": "Paczki pobrane przez bun install."
+  },
+  "yarn.cache": {
+    "title": "Cache Yarn",
+    "description": "Paczki pobrane przez Yarn."
+  },
+  "pnpm.store": {
+    "title": "Magazyn paczek pnpm",
+    "description": "Wspólny magazyn paczek pnpm; projekty mają do niego dowiązania twarde.",
+    "regeneration": "pnpm install pobierze paczki ponownie."
+  },
+  "nuget.packages": {
+    "title": "Pakiety NuGet",
+    "description": "Pobrane pakiety .NET używane przez projekty (Rider, dotnet build).",
+    "regeneration": "dotnet restore pobierze je ponownie."
+  },
+  "nuget.http-cache": {
+    "title": "Cache HTTP NuGet",
+    "description": "Odpowiedzi serwera NuGet zapisane podczas restore."
+  },
+  "pub.cache": {
+    "title": "Pakiety Dart (pub)",
+    "description": "Pobrane pakiety z pub.dev używane przez projekty Flutter i Dart.",
+    "regeneration": "flutter pub get pobierze je ponownie."
+  },
+  "dart.analysis": {
+    "title": "Cache analizatora Dart",
+    "description": "Wyniki analizy kodu serwera językowego Dart (podpowiedzi w IDE).",
+    "regeneration": "Odtworzy się przy otwarciu projektu w IDE."
+  },
+  "fvm.old": {
+    "title": "Stare wersje Flutter SDK (FVM)",
+    "description": "Wersje Flutter zainstalowane przez FVM, z wyjątkiem najnowszej. Projekty przypięte do starszej wersji przestaną się budować, dopóki jej nie zainstalujesz.",
+    "regeneration": "fvm install <wersja>."
+  },
+  "nvm.old": {
+    "title": "Stare wersje Node.js (nvm)",
+    "description": "Wersje Node.js zainstalowane przez nvm, z wyjątkiem najnowszej, razem z ich globalnymi paczkami.",
+    "regeneration": "nvm install <wersja>."
+  },
+  "nvm.cache": {
+    "title": "Cache pobrań nvm",
+    "description": "Pobrane archiwa instalacyjne Node.js."
+  },
+  "cocoapods.cache": {
+    "title": "Cache CocoaPods",
+    "description": "Pobrane pody i specyfikacje CocoaPods."
+  },
+  "swiftpm.cache": {
+    "title": "Cache Swift Package Manager",
+    "description": "Sklonowane repozytoria zależności pakietów Swift."
+  },
+  "go.buildcache": {
+    "title": "Cache kompilacji Go",
+    "description": "Wyniki kompilacji pakietów Go."
+  },
+  "cargo.registry": {
+    "title": "Rejestr paczek Cargo",
+    "description": "Pobrane i rozpakowane crate'y Rust.",
+    "regeneration": "cargo build pobierze je ponownie."
+  },
+  "maven.repository": {
+    "title": "Lokalne repozytorium Maven",
+    "description": "Pobrane biblioteki Javy.",
+    "regeneration": "mvn pobierze je ponownie."
+  },
+  "uv.tools": {
+    "title": "Narzędzia i Pythony zainstalowane przez uv",
+    "description": "Interpretery Pythona i narzędzia CLI zainstalowane przez uv (uv python install, uv tool install). Usunięcie wyłączy te narzędzia.",
+    "regeneration": "uv tool install / uv python install."
+  },
+  "nvm.current": {
+    "title": "Zainstalowane Node.js (nvm)",
+    "description": "Aktualna wersja Node.js z nvm razem z globalnie zainstalowanymi paczkami."
+  },
+  "dotnet.sdk": {
+    "title": ".NET SDK zainstalowane lokalnie",
+    "description": "SDK i środowiska .NET zainstalowane skryptem dotnet-install w katalogu domowym."
+  },
+  "xcode.deriveddata": {
+    "title": "DerivedData (wyniki budowania Xcode)",
+    "description": "Pliki pośrednie, indeksy i wyniki budowania projektów Xcode, osobno dla każdego projektu. ModuleCache to wspólny cache skompilowanych modułów.",
+    "regeneration": "Xcode odtworzy je przy następnym buildzie (pierwszy build będzie dłuższy)."
+  },
+  "xcode.devicesupport": {
+    "title": "Symbole urządzeń (DeviceSupport)",
+    "description": "Symbole debugowania kopiowane z podłączonych iPhone'ów, iPadów i zegarków, osobno dla każdej wersji systemu.",
+    "regeneration": "Xcode skopiuje je ponownie po podłączeniu urządzenia (kilka minut)."
+  },
+  "xcode.archives": {
+    "title": "Archiwa Xcode",
+    "description": "Zbudowane wersje aplikacji wysłane do App Store lub TestFlight, razem z plikami dSYM potrzebnymi do odczytu raportów awarii.",
+    "regeneration": "Nie da się odtworzyć dokładnie tej samej kompilacji."
+  },
+  "xcode.previews": {
+    "title": "Podglądy SwiftUI",
+    "description": "Symulatory i buildy używane przez podgląd SwiftUI (Previews)."
+  },
+  "xcode.caches": {
+    "title": "Cache Xcode",
+    "description": "Cache aplikacji Xcode (m.in. dokumentacja i pobrania)."
+  },
+  "xcode.simulator-logs": {
+    "title": "Logi symulatorów",
+    "description": "Logi systemowe symulatorów iOS."
+  },
+  "android.avd": {
+    "title": "Emulatory Android (AVD)",
+    "description": "Dyski i snapshoty emulatorów Android razem z zainstalowanymi w nich aplikacjami i danymi. Usuń też plik .ini o tej samej nazwie, jeśli chcesz, żeby emulator zniknął z listy.",
+    "regeneration": "Emulator można utworzyć ponownie w Android Studio lub avdmanager."
+  },
+  "android.system-images": {
+    "title": "Obrazy systemu Android (SDK)",
+    "description": "Obrazy systemu, z których startują emulatory. Bez nich emulator danej wersji nie uruchomi się.",
+    "regeneration": "sdkmanager pobierze obraz ponownie."
+  },
+  "android.ndk": {
+    "title": "Android NDK",
+    "description": "Narzędzia do kompilacji kodu natywnego (C/C++) dla Androida. Potrzebne projektom Flutter i React Native z kodem natywnym.",
+    "regeneration": "sdkmanager lub Gradle pobierze potrzebną wersję."
+  },
+  "android.cache": {
+    "title": "Cache narzędzi Android",
+    "description": "Cache sdkmanagera i narzędzi Android."
+  },
+  "claude.desktop.vm": {
+    "title": "Maszyna wirtualna Claude Desktop",
+    "description": "Obraz izolowanej maszyny wirtualnej, w której Claude Desktop uruchamia pracę agenta (kod, pliki). Zawiera system i środowisko narzędzi.",
+    "regeneration": "Claude Desktop pobierze obraz ponownie, gdy będzie potrzebny (kilka GB)."
+  },
+  "claude.desktop.cache": {
+    "title": "Cache Claude Desktop",
+    "description": "Cache przeglądarki wbudowanej w Claude Desktop (strony, skrypty, shadery GPU).",
+    "regeneration": "Odtworzy się automatycznie."
+  },
+  "claude.code.sessions": {
+    "title": "Transkrypcje sesji Claude Code",
+    "description": "Zapis rozmów z Claude Code, osobno dla każdego projektu i sesji. Służy do wznawiania sesji (claude --resume) i historii. Katalogi pamięci projektu (memory) nie są tu pokazywane. Claude Code sam usuwa sesje starsze niż 30 dni (ustawienie cleanupPeriodDays w ~/.claude/settings.json), więc zwykle są tu tylko świeże.",
+    "regeneration": "Nie da się odtworzyć; po usunięciu sesji nie można wznowić."
+  },
+  "claude.code.temp": {
+    "title": "Pliki tymczasowe Claude Code",
+    "description": "Logi debugowania, migawki powłoki i listy zadań z zakończonych sesji Claude Code."
+  },
+  "claude.code.file-history": {
+    "title": "Historia zmian plików Claude Code",
+    "description": "Kopie plików sprzed edycji, pozwalające cofnąć zmiany w sesji (checkpointy).",
+    "regeneration": "Nie da się odtworzyć; stracisz możliwość cofania zmian w starszych sesjach."
+  },
+  "claude.code.versions": {
+    "title": "Stare wersje Claude Code",
+    "description": "Wcześniejsze wersje programu Claude Code (każda ok. 220 MB); najnowsza zostaje. Sesje uruchomione na starszej wersji działają dalej do zamknięcia."
+  },
+  "claude-mem.logs": {
+    "title": "Logi claude-mem",
+    "description": "Logi wtyczki pamięci claude-mem."
+  },
+  "codex.sessions": {
+    "title": "Sesje Codex",
+    "description": "Zapis rozmów z Codex, pogrupowany według dni. Służy do wznawiania sesji.",
+    "regeneration": "Nie da się odtworzyć."
+  },
+  "codex.tmp": {
+    "title": "Pliki tymczasowe i logi Codex",
+    "description": "Pliki tymczasowe i logi Codex CLI."
+  },
+  "codex.runtimes": {
+    "title": "Środowiska uruchomieniowe Codex",
+    "description": "Pobrane środowiska (Node, Python i narzędzia), w których Codex uruchamia polecenia.",
+    "regeneration": "Codex pobierze je ponownie przy następnym uruchomieniu."
+  },
+  "codex.cache": {
+    "title": "Cache aplikacji Codex",
+    "description": "Cache aplikacji Codex i CodexBar."
+  },
+  "huggingface.models": {
+    "title": "Modele Hugging Face",
+    "description": "Modele pobrane z Hugging Face (np. Whisper dla superwhisper i MLX, modele pyannote i speechbrain do rozpoznawania mówców). Pliki modeli są współdzielone w jednym magazynie, więc katalog usuwa się w całości.",
+    "regeneration": "Program pobierze model ponownie przy następnym użyciu (często kilka GB)."
+  },
+  "torch.cache": {
+    "title": "Modele PyTorch",
+    "description": "Wagi modeli pobrane przez torch.hub i biblioteki oparte na PyTorch.",
+    "regeneration": "Pobiorą się ponownie przy użyciu."
+  },
+  "lmstudio.models": {
+    "title": "Modele LM Studio",
+    "description": "Lokalne modele językowe pobrane w LM Studio.",
+    "regeneration": "Pobierz model ponownie w LM Studio."
+  },
+  "ollama.models": {
+    "title": "Modele Ollama",
+    "description": "Lokalne modele Ollama.",
+    "regeneration": "ollama pull <model>."
+  },
+  "superwhisper.recordings": {
+    "title": "Nagrania superwhisper",
+    "description": "Nagrania dyktowania zapisane przez superwhisper."
+  },
+  "claude.desktop.bundled-code": {
+    "title": "Claude Code wbudowany w Claude Desktop",
+    "description": "Kopie programu Claude Code pobrane przez aplikację Claude Desktop (dla trybu lokalnego i maszyny wirtualnej).",
+    "regeneration": "Claude Desktop pobierze je ponownie."
+  },
+  "lmstudio.runtimes": {
+    "title": "Silniki LM Studio (llama.cpp, MLX)",
+    "description": "Pobrane silniki uruchamiania modeli i wtyczki LM Studio.",
+    "regeneration": "LM Studio pobierze silnik przy następnym uruchomieniu modelu."
+  },
+  "claude.code.plugins": {
+    "title": "Wtyczki i ustawienia Claude Code",
+    "description": "Zainstalowane wtyczki, marketplace'y, skille i ustawienia Claude Code. Zarządzaj nimi poleceniem /plugin."
+  },
+  "claude-mem.data": {
+    "title": "Pamięć claude-mem",
+    "description": "Baza obserwacji i indeks wektorowy pamięci claude-mem."
+  },
+  "codex.data": {
+    "title": "Wtyczki i ustawienia Codex",
+    "description": "Konfiguracja, wtyczki i dane Codex."
+  },
+  "claude.desktop.data": {
+    "title": "Dane Claude Desktop",
+    "description": "Ustawienia, sesje lokalnego agenta i dane logowania Claude Desktop."
+  },
+  "lmstudio.data": {
+    "title": "Dane LM Studio",
+    "description": "Ustawienia, rozmowy i pozostałe dane LM Studio."
+  },
+  "brave.cache": {
+    "title": "Cache Brave",
+    "description": "Pobrane strony, obrazy i skrypty oraz skompilowany kod stron. Zamknij Brave przed usunięciem.",
+    "regeneration": "Strony załadują się ponownie z sieci."
+  },
+  "brave.serviceworker": {
+    "title": "Pamięć Service Workerów Brave",
+    "description": "Pliki zapisane przez strony do pracy offline (aplikacje webowe, PWA). Strony pobiorą je ponownie; logowania i ustawienia zostają."
+  },
+  "chrome.cache": {
+    "title": "Cache Chrome",
+    "description": "Pobrane strony, obrazy i skrypty oraz skompilowany kod stron. Zamknij Chrome przed usunięciem.",
+    "regeneration": "Strony załadują się ponownie z sieci."
+  },
+  "edge.cache": {
+    "title": "Cache Edge",
+    "description": "Cache stron i skompilowanego kodu w Microsoft Edge."
+  },
+  "firefox.cache": {
+    "title": "Cache Firefox",
+    "description": "Cache stron Firefoksa."
+  },
+  "safari.cache": {
+    "title": "Cache Safari",
+    "description": "Cache stron Safari. Wymaga Pełnego dostępu do dysku."
+  },
+  "playwright.chrome-profiles": {
+    "title": "Profile Chrome do debugowania",
+    "description": "Osobne profile Chrome uruchamianego z --user-data-dir do automatyzacji i debugowania (np. przez agentów)."
+  },
+  "spotify.cache": {
+    "title": "Cache muzyki Spotify",
+    "description": "Fragmenty odtwarzanych utworów zapisane do szybszego odtwarzania. Utwory pobrane do słuchania offline są gdzie indziej i zostają.",
+    "regeneration": "Spotify pobierze utwory ponownie podczas słuchania."
+  },
+  "jetbrains.caches": {
+    "title": "Cache i indeksy IDE JetBrains",
+    "description": "Indeksy projektów, cache kompilacji i pobrane zasoby Ridera, PyCharma, DataGripa i innych IDE JetBrains, osobno dla każdego IDE.",
+    "regeneration": "IDE przeindeksuje projekty przy otwarciu (kilka minut)."
+  },
+  "jetbrains.logs": {
+    "title": "Logi IDE JetBrains",
+    "description": "Logi działania IDE JetBrains."
+  },
+  "jetbrains.old-config": {
+    "title": "Ustawienia starszych wersji IDE JetBrains",
+    "description": "Ustawienia, wtyczki i lokalna historia wcześniejszych wersji IDE. Nowsza wersja zaimportowała je przy pierwszym uruchomieniu; najnowsza wersja każdego IDE zostaje."
+  },
+  "jetbrains.config": {
+    "title": "Ustawienia i wtyczki IDE JetBrains",
+    "description": "Ustawienia, wtyczki, lokalna historia zmian i konsole baz danych aktualnych wersji IDE JetBrains."
+  },
+  "vscode.cache": {
+    "title": "Cache Visual Studio Code",
+    "description": "Cache okna edytora, skompilowany kod rozszerzeń i pobrane paczki rozszerzeń.",
+    "regeneration": "Odtworzy się przy uruchomieniu."
+  },
+  "updaters": {
+    "app": "Różne",
+    "title": "Pobrane aktualizacje programów",
+    "description": "Instalatory aktualizacji pobrane przez programy (VS Code, Termius, Recordly i inne). Po instalacji aktualizacji nie są już potrzebne.",
+    "regeneration": "Program pobierze aktualizację ponownie, jeśli będzie potrzebna."
+  },
+  "electron.caches": {
+    "app": "Różne",
+    "title": "Cache aplikacji Electron",
+    "description": "Cache wbudowanej przeglądarki w aplikacjach opartych na Electronie (Slack, Discord, Postman, Obsidian, Termius, Warp, Teams i inne).",
+    "regeneration": "Odtworzy się przy uruchomieniu programu.",
+    "note": "Zamknij odpowiedni program przed usunięciem."
+  },
+  "whatsapp.data": {
+    "title": "Wiadomości i multimedia WhatsApp",
+    "description": "Baza wiadomości, zdjęcia, filmy i notatki głosowe WhatsApp. Multimedia usuwa się w WhatsApp: Ustawienia > Pamięć i dane > Zarządzaj pamięcią."
+  },
+  "warp.data": {
+    "title": "Dane terminala Warp",
+    "description": "Historia poleceń, bloki, ustawienia i baza Warp."
+  },
+  "recordly.data": {
+    "title": "Nagrania i dane Recordly",
+    "description": "Nagrania ekranu i projekty Recordly."
+  },
+  "browser.profiles": {
+    "app": "Przeglądarki",
+    "title": "Profile przeglądarek (historia, hasła, rozszerzenia)",
+    "description": "Pozostała część profili przeglądarek: historia, zakładki, zapisane logowania, rozszerzenia i dane stron (IndexedDB). Cache jest pokazany osobno powyżej."
+  },
+  "postman.data": {
+    "title": "Dane Postmana",
+    "description": "Kolekcje, środowiska, historia zapytań i dane logowania Postmana."
+  },
+  "termius.data": {
+    "title": "Dane Termiusa",
+    "description": "Hosty, klucze, historia i ustawienia Termiusa."
+  },
+  "system.temp": {
+    "title": "Pliki tymczasowe użytkownika",
+    "description": "Pliki tymczasowe programów w katalogu systemowym $TMPDIR. Programy usuwają je same, ale często zostają po awariach. Domyślnie widać tylko starsze niż 7 dni, bo nowsze mogą być w użyciu."
+  },
+  "system.diagnostics": {
+    "title": "Raporty awarii",
+    "description": "Raporty awarii i zawieszeń programów zebrane przez macOS."
+  },
+  "system.ios-updates": {
+    "title": "Pobrane aktualizacje iOS",
+    "description": "Pliki aktualizacji iPhone'a/iPada pobrane przy aktualizacji przez Mac."
+  },
+  "system.ios-backups": {
+    "title": "Kopie zapasowe iPhone'a i iPada",
+    "description": "Lokalne kopie zapasowe urządzeń iOS. Jeśli kopia w iCloud jest aktualna, lokalna może być zbędna. Wymaga Pełnego dostępu do dysku.",
+    "regeneration": "Nie da się odtworzyć starej kopii; nową zrobisz po podłączeniu urządzenia."
+  },
+  "system.mail-downloads": {
+    "title": "Załączniki otwarte w Mail",
+    "description": "Kopie załączników otwieranych w programie Mail. Oryginały zostają w wiadomościach."
+  },
+  "system.logs": {
+    "app": "Różne",
+    "title": "Logi programów",
+    "description": "Pliki logów zapisywane przez programy w ~/Library/Logs. Przydają się tylko przy diagnozowaniu problemów."
+  },
+  "system.other-caches": {
+    "app": "Różne",
+    "title": "Pozostałe cache programów",
+    "description": "Pozostałe katalogi w ~/Library/Caches. Z założenia macOS to dane, które programy mogą odtworzyć; zamknij program przed usunięciem jego cache.",
+    "regeneration": "Program odtworzy cache przy uruchomieniu."
+  },
+  "system.trash": {
+    "title": "Kosz",
+    "description": "Pliki przeniesione do Kosza, w tym przez GRUZ. Miejsce zwolni się dopiero po opróżnieniu Kosza w Finderze. Wymaga Pełnego dostępu do dysku, żeby zmierzyć rozmiar."
+  },
+  "artifact.node_modules": {
+    "title": "Zależności npm (node_modules)",
+    "description": "Zainstalowane paczki JavaScript projektu.",
+    "regeneration": "npm install (lub yarn/pnpm/bun install) w katalogu projektu."
+  },
+  "artifact.venv": {
+    "title": "Środowiska Pythona (.venv)",
+    "description": "Wirtualne środowisko Pythona z zainstalowanymi paczkami projektu.",
+    "regeneration": "uv sync, poetry install lub pip install -r requirements.txt."
+  },
+  "artifact.dotnet-bin": {
+    "title": "Wyniki kompilacji .NET (bin, obj)",
+    "description": "Skompilowane biblioteki i pliki pośrednie projektów .NET.",
+    "regeneration": "dotnet build albo build w Riderze."
+  },
+  "artifact.swiftpm": {
+    "title": "Build Swift Package Manager (.build)",
+    "description": "Pobrane zależności i wyniki kompilacji pakietu Swift.",
+    "regeneration": "swift build."
+  },
+  "artifact.deriveddata": {
+    "title": "DerivedData w projektach",
+    "description": "Wyniki budowania Xcode zapisane w katalogu projektu.",
+    "regeneration": "Build w Xcode."
+  },
+  "artifact.flutter-build": {
+    "title": "Katalogi build",
+    "description": "Wyniki budowania (Flutter, Gradle, CMake, Python).",
+    "regeneration": "Ponowny build projektu."
+  },
+  "artifact.dart_tool": {
+    "title": "Cache narzędzi Dart (.dart_tool)",
+    "description": "Konfiguracja pakietów i cache narzędzi Dart/Flutter projektu.",
+    "regeneration": "flutter pub get."
+  },
+  "artifact.gradle-project": {
+    "title": "Cache Gradle w projektach",
+    "description": "Lokalny cache Gradle i Kotlina dla projektu.",
+    "regeneration": "Odtworzy się przy buildzie."
+  },
+  "artifact.pods": {
+    "title": "Zależności CocoaPods (Pods)",
+    "description": "Zainstalowane pody projektu iOS.",
+    "regeneration": "pod install."
+  },
+  "artifact.web-build": {
+    "title": "Zbudowane frontendy i cache narzędzi web",
+    "description": "Wyniki budowania i cache narzędzi JavaScript (Vite, Next.js, Nuxt, Turbo, Angular) oraz raporty pokrycia testów.",
+    "regeneration": "npm run build."
+  },
+  "artifact.rust-target": {
+    "title": "Artefakty Rust (target)",
+    "description": "Wyniki kompilacji i pliki pośrednie projektu Cargo (profile debug i release).",
+    "regeneration": "cargo build."
+  },
+  "artifact.python-caches": {
+    "title": "Cache narzędzi Pythona",
+    "description": "Skompilowany bajtkod (.pyc) i cache narzędzi pytest, mypy, ruff, tox.",
+    "regeneration": "Odtwarza się automatycznie przy uruchomieniu."
+  },
+  "artifact.agent-worktrees": {
+    "title": "Worktree agentów Claude Code",
+    "description": "Robocze kopie repozytorium (git worktree) tworzone przez agentów Claude Code. Mogą zawierać niezacommitowaną pracę, więc sprawdź stan Git podany przy pozycji. Po usunięciu katalogu uruchom w repozytorium git worktree prune."
+  },
+  "artifact.maven-target": {
+    "title": "Wyniki kompilacji Maven",
+    "description": "Skompilowane pliki projektu Maven.",
+    "regeneration": "mvn package."
+  }
+}

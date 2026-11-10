@@ -1,0 +1,253 @@
+[
+  {
+    "id": "spotify.cache",
+    "category": "apps",
+    "app": "Spotify",
+    "title": "Spotify music cache",
+    "description": "Parts of played tracks stored for faster playback. Tracks downloaded for offline listening are stored elsewhere and are kept.",
+    "regeneration": "Spotify downloads the tracks again as you listen.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/com.spotify.client"
+    ],
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "com.spotify.client"
+    ]
+  },
+  {
+    "id": "jetbrains.caches",
+    "category": "apps",
+    "app": "JetBrains",
+    "title": "JetBrains IDE caches and indexes",
+    "description": "Project indexes, compilation caches and downloaded resources of Rider, PyCharm, DataGrip and other JetBrains IDEs, one folder per IDE.",
+    "regeneration": "The IDE reindexes projects when you open them (a few minutes).",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/JetBrains/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "com.jetbrains.rider",
+      "com.jetbrains.pycharm",
+      "com.jetbrains.datagrip",
+      "com.jetbrains.intellij",
+      "com.jetbrains.WebStorm",
+      "com.jetbrains.toolbox"
+    ]
+  },
+  {
+    "id": "jetbrains.logs",
+    "category": "apps",
+    "app": "JetBrains",
+    "title": "JetBrains IDE logs",
+    "description": "Activity logs of JetBrains IDEs.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Logs/JetBrains/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "jetbrains.old-config",
+    "category": "apps",
+    "app": "JetBrains",
+    "title": "Settings of older JetBrains IDE versions",
+    "description": "Settings, plugins and local history of earlier IDE versions. The newer version imported them on its first launch; the newest version of each IDE is kept.",
+    "safety": "caution",
+    "kind": "versions",
+    "paths": [
+      "~/Library/Application Support/JetBrains"
+    ],
+    "versionPattern": "^(?<name>[A-Za-z]+)(?<version>[0-9]{4}\\.[0-9]+)$",
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "jetbrains.config",
+    "category": "apps",
+    "app": "JetBrains",
+    "title": "JetBrains IDE settings and plugins",
+    "description": "Settings, plugins, local history and database consoles of the current JetBrains IDE versions.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Application Support/JetBrains"
+    ]
+  },
+  {
+    "id": "vscode.cache",
+    "category": "apps",
+    "app": "Visual Studio Code",
+    "title": "Visual Studio Code cache",
+    "description": "Editor window cache, compiled extension code and downloaded extension packages.",
+    "regeneration": "Rebuilt on launch.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Application Support/Code/Cache",
+      "~/Library/Application Support/Code/CachedData",
+      "~/Library/Application Support/Code/CachedExtensionVSIXs",
+      "~/Library/Application Support/Code/Code Cache",
+      "~/Library/Application Support/Code/GPUCache",
+      "~/Library/Application Support/Code/logs"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "com.microsoft.VSCode"
+    ]
+  },
+  {
+    "id": "updaters",
+    "category": "apps",
+    "app": "Various",
+    "title": "Downloaded app updates",
+    "description": "Update installers downloaded by apps (VS Code, Termius, Recordly and others). Once the update is installed, they are no longer needed.",
+    "regeneration": "The app downloads the update again if needed.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/*.ShipIt",
+      "~/Library/Caches/*-updater",
+      "~/Library/Application Support/Caches/*-updater"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "electron.caches",
+    "category": "apps",
+    "app": "Various",
+    "title": "Electron app caches",
+    "description": "Cache of the built-in browser in Electron-based apps (Slack, Discord, Postman, Obsidian, Termius, Warp, Teams and others).",
+    "regeneration": "Rebuilt when the app starts.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Application Support/Slack/Cache",
+      "~/Library/Application Support/Slack/Code Cache",
+      "~/Library/Application Support/Slack/Service Worker/CacheStorage",
+      "~/Library/Application Support/discord/Cache",
+      "~/Library/Application Support/discord/Code Cache",
+      "~/Library/Application Support/Postman/Cache",
+      "~/Library/Application Support/Postman/Code Cache",
+      "~/Library/Application Support/Postman/GPUCache",
+      "~/Library/Application Support/obsidian/Cache",
+      "~/Library/Application Support/obsidian/Code Cache",
+      "~/Library/Application Support/Termius/Cache",
+      "~/Library/Application Support/Termius/Code Cache",
+      "~/Library/Application Support/Microsoft Teams/Cache",
+      "~/Library/Application Support/Microsoft/Teams/Cache",
+      "~/Library/Application Support/Recordly/Cache",
+      "~/Library/Application Support/Recordly/Code Cache",
+      "~/Library/Application Support/Notion/Cache",
+      "~/Library/Application Support/Notion/Code Cache"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": {
+      "type": "trash"
+    },
+    "note": "Quit the corresponding app before removing it."
+  },
+  {
+    "id": "whatsapp.data",
+    "category": "apps",
+    "app": "WhatsApp",
+    "title": "WhatsApp messages and media",
+    "description": "WhatsApp message database, photos, videos and voice notes. Remove media in WhatsApp: Settings > Storage and Data > Manage Storage.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared"
+    ],
+    "ownerBundleIDs": [
+      "net.whatsapp.WhatsApp"
+    ]
+  },
+  {
+    "id": "warp.data",
+    "category": "apps",
+    "app": "Warp",
+    "title": "Warp terminal data",
+    "description": "Warp command history, blocks, settings and database.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Application Support/dev.warp.Warp-Stable",
+      "~/Library/Group Containers/2BBY89MBSN.dev.warp"
+    ],
+    "group": true,
+    "ownerBundleIDs": [
+      "dev.warp.Warp-Stable"
+    ]
+  },
+  {
+    "id": "recordly.data",
+    "category": "apps",
+    "app": "Recordly",
+    "title": "Recordly recordings and data",
+    "description": "Recordly screen recordings and projects.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Application Support/Recordly"
+    ],
+    "ownerBundleIDs": [
+      "dev.recordly.app"
+    ]
+  },
+  {
+    "id": "browser.profiles",
+    "category": "browsers",
+    "app": "Browsers",
+    "title": "Browser profiles (history, passwords, extensions)",
+    "description": "The rest of browser profiles: history, bookmarks, saved logins, extensions and site data (IndexedDB). Caches are listed separately above.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Application Support/BraveSoftware",
+      "~/Library/Application Support/Google/Chrome",
+      "~/Library/Application Support/Firefox",
+      "~/Library/Application Support/Microsoft Edge"
+    ],
+    "group": true
+  },
+  {
+    "id": "postman.data",
+    "category": "apps",
+    "app": "Postman",
+    "title": "Postman data",
+    "description": "Postman collections, environments, request history and sign-in data.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Application Support/Postman"
+    ],
+    "ownerBundleIDs": [
+      "com.postmanlabs.mac"
+    ]
+  },
+  {
+    "id": "termius.data",
+    "category": "apps",
+    "app": "Termius",
+    "title": "Termius data",
+    "description": "Termius hosts, keys, history and settings.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Application Support/Termius"
+    ],
+    "ownerBundleIDs": [
+      "com.termius-dmg.mac"
+    ]
+  }
+]

@@ -1,0 +1,383 @@
+[
+  {
+    "id": "claude.desktop.vm",
+    "category": "ai",
+    "app": "Claude Desktop",
+    "title": "Claude Desktop virtual machine",
+    "description": "Image of the isolated virtual machine in which Claude Desktop runs agent work (code, files). It contains the operating system and the tool environment.",
+    "regeneration": "Claude Desktop downloads the image again when needed (several GB).",
+    "safety": "caution",
+    "paths": [
+      "~/Library/Application Support/Claude/vm_bundles"
+    ],
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "com.anthropic.claudefordesktop"
+    ]
+  },
+  {
+    "id": "claude.desktop.cache",
+    "category": "ai",
+    "app": "Claude Desktop",
+    "title": "Claude Desktop cache",
+    "description": "Cache of the browser built into Claude Desktop (pages, scripts, GPU shaders).",
+    "regeneration": "Rebuilt automatically.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Application Support/Claude/Cache",
+      "~/Library/Application Support/Claude/Code Cache",
+      "~/Library/Application Support/Claude/GPUCache",
+      "~/Library/Application Support/Claude/DawnWebGPUCache",
+      "~/Library/Application Support/Claude/DawnGraphiteCache",
+      "~/Library/Caches/com.anthropic.claudefordesktop*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "com.anthropic.claudefordesktop"
+    ]
+  },
+  {
+    "id": "claude.code.sessions",
+    "category": "ai",
+    "app": "Claude Code",
+    "title": "Claude Code session transcripts",
+    "description": "Records of Claude Code conversations, one per project and session. Used to resume sessions (claude --resume) and for history. Project memory folders (memory) are not shown here. Claude Code deletes sessions older than 30 days by itself (the cleanupPeriodDays setting in ~/.claude/settings.json), so usually only recent ones are here.",
+    "regeneration": "Cannot be recreated; a removed session cannot be resumed.",
+    "safety": "caution",
+    "paths": [
+      "~/.claude/projects/*/*"
+    ],
+    "excludeNames": [
+      "memory"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": {
+      "type": "trash"
+    },
+    "defaultAgeDays": 30
+  },
+  {
+    "id": "claude.code.temp",
+    "category": "ai",
+    "app": "Claude Code",
+    "title": "Claude Code temporary files",
+    "description": "Debug logs, shell snapshots and task lists from finished Claude Code sessions.",
+    "safety": "safe",
+    "paths": [
+      "~/.claude/debug",
+      "~/.claude/shell-snapshots",
+      "~/.claude/todos",
+      "~/.claude/statsig"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "claude.code.file-history",
+    "category": "ai",
+    "app": "Claude Code",
+    "title": "Claude Code file history",
+    "description": "Copies of files from before edits, used to undo changes in a session (checkpoints).",
+    "regeneration": "Cannot be recreated; you lose the ability to undo changes in older sessions.",
+    "safety": "caution",
+    "paths": [
+      "~/.claude/file-history/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "defaultAgeDays": 30
+  },
+  {
+    "id": "claude.code.versions",
+    "category": "ai",
+    "app": "Claude Code",
+    "title": "Old Claude Code versions",
+    "description": "Previous versions of Claude Code (about 220 MB each); the newest is kept. Sessions started on an older version keep running until they are closed.",
+    "safety": "safe",
+    "kind": "versions",
+    "paths": [
+      "~/.local/share/claude/versions"
+    ],
+    "versionPattern": "^(?<version>[0-9][0-9.]*)$",
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "claude-mem.logs",
+    "category": "ai",
+    "app": "claude-mem",
+    "title": "claude-mem logs",
+    "description": "Logs of the claude-mem memory plugin.",
+    "safety": "safe",
+    "paths": [
+      "~/.claude-mem/logs"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "codex.sessions",
+    "category": "ai",
+    "app": "Codex",
+    "title": "Codex sessions",
+    "description": "Records of Codex conversations, grouped by day. Used to resume sessions.",
+    "regeneration": "Cannot be recreated.",
+    "safety": "caution",
+    "paths": [
+      "~/.codex/sessions/*/*/*"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": {
+      "type": "trash"
+    },
+    "defaultAgeDays": 30
+  },
+  {
+    "id": "codex.tmp",
+    "category": "ai",
+    "app": "Codex",
+    "title": "Codex temporary files and logs",
+    "description": "Temporary files and logs of Codex CLI.",
+    "safety": "safe",
+    "paths": [
+      "~/.codex/.tmp",
+      "~/.codex/log"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "codex.runtimes",
+    "category": "ai",
+    "app": "Codex",
+    "title": "Codex runtimes",
+    "description": "Downloaded environments (Node, Python and tools) in which Codex runs commands.",
+    "regeneration": "Codex downloads them again the next time it starts.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.cache/codex-runtimes",
+      "~/.codex/packages"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "com.openai.codex"
+    ]
+  },
+  {
+    "id": "codex.cache",
+    "category": "ai",
+    "app": "Codex",
+    "title": "Codex app cache",
+    "description": "Cache of the Codex and CodexBar apps.",
+    "safety": "safe",
+    "paths": [
+      "~/Library/Caches/Codex",
+      "~/Library/Caches/CodexBar",
+      "~/Library/Caches/com.openai.codex",
+      "~/Library/Caches/com.steipete.codexbar"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "huggingface.models",
+    "category": "ai",
+    "app": "Hugging Face",
+    "title": "Hugging Face models",
+    "description": "Models downloaded from Hugging Face (e.g. Whisper for superwhisper and MLX, pyannote and speechbrain models for speaker recognition). Model files are shared in a single store, so the folder is removed as a whole.",
+    "regeneration": "The app downloads the model again the next time it is used (often several GB).",
+    "safety": "regenerable",
+    "paths": [
+      "~/.cache/huggingface"
+    ],
+    "group": false,
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "torch.cache",
+    "category": "ai",
+    "app": "PyTorch",
+    "title": "PyTorch models",
+    "description": "Model weights downloaded by torch.hub and PyTorch-based libraries.",
+    "regeneration": "Downloaded again when used.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.cache/torch"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "lmstudio.models",
+    "category": "ai",
+    "app": "LM Studio",
+    "title": "LM Studio models",
+    "description": "Local language models downloaded in LM Studio.",
+    "regeneration": "Download the model again in LM Studio.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.lmstudio/models/*/*",
+      "~/.cache/lm-studio/models/*/*"
+    ],
+    "group": true,
+    "childTitle": "parentAndName",
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "ollama.models",
+    "category": "ai",
+    "app": "Ollama",
+    "title": "Ollama models",
+    "description": "Local Ollama models.",
+    "regeneration": "ollama pull <model>.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.ollama/models"
+    ],
+    "action": {
+      "type": "trash"
+    }
+  },
+  {
+    "id": "superwhisper.recordings",
+    "category": "ai",
+    "app": "superwhisper",
+    "title": "superwhisper recordings",
+    "description": "Dictation recordings saved by superwhisper.",
+    "safety": "caution",
+    "paths": [
+      "~/Library/Application Support/superwhisper/recordings/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "defaultAgeDays": 30
+  },
+  {
+    "id": "claude.desktop.bundled-code",
+    "category": "ai",
+    "app": "Claude Desktop",
+    "title": "Claude Code bundled with Claude Desktop",
+    "description": "Copies of Claude Code downloaded by the Claude Desktop app (for local mode and the virtual machine).",
+    "regeneration": "Claude Desktop downloads them again.",
+    "safety": "regenerable",
+    "paths": [
+      "~/Library/Application Support/Claude/claude-code",
+      "~/Library/Application Support/Claude/claude-code-vm"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "com.anthropic.claudefordesktop"
+    ]
+  },
+  {
+    "id": "lmstudio.runtimes",
+    "category": "ai",
+    "app": "LM Studio",
+    "title": "LM Studio runtimes (llama.cpp, MLX)",
+    "description": "Model runtimes and plugins downloaded by LM Studio.",
+    "regeneration": "LM Studio downloads the runtime the next time a model is loaded.",
+    "safety": "regenerable",
+    "paths": [
+      "~/.lmstudio/extensions/backends/*"
+    ],
+    "group": true,
+    "action": {
+      "type": "trash"
+    },
+    "requiresAppClosed": true,
+    "ownerBundleIDs": [
+      "ai.elementlabs.lmstudio"
+    ]
+  },
+  {
+    "id": "claude.code.plugins",
+    "category": "ai",
+    "app": "Claude Code",
+    "title": "Claude Code plugins and settings",
+    "description": "Installed plugins, marketplaces, skills and settings of Claude Code. Manage them with the /plugin command.",
+    "safety": "userData",
+    "paths": [
+      "~/.claude"
+    ]
+  },
+  {
+    "id": "claude-mem.data",
+    "category": "ai",
+    "app": "claude-mem",
+    "title": "claude-mem memory",
+    "description": "The claude-mem observation database and vector index.",
+    "safety": "userData",
+    "paths": [
+      "~/.claude-mem"
+    ]
+  },
+  {
+    "id": "codex.data",
+    "category": "ai",
+    "app": "Codex",
+    "title": "Codex plugins and settings",
+    "description": "Codex configuration, plugins and data.",
+    "safety": "userData",
+    "paths": [
+      "~/.codex",
+      "~/Library/Application Support/Codex"
+    ],
+    "group": true
+  },
+  {
+    "id": "claude.desktop.data",
+    "category": "ai",
+    "app": "Claude Desktop",
+    "title": "Claude Desktop data",
+    "description": "Settings, local agent sessions and sign-in data of Claude Desktop.",
+    "safety": "userData",
+    "paths": [
+      "~/Library/Application Support/Claude"
+    ]
+  },
+  {
+    "id": "lmstudio.data",
+    "category": "ai",
+    "app": "LM Studio",
+    "title": "LM Studio data",
+    "description": "Settings, chats and other LM Studio data.",
+    "safety": "userData",
+    "paths": [
+      "~/.lmstudio"
+    ]
+  }
+]

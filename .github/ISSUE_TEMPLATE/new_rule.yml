@@ -1,0 +1,29 @@
+name: Recognize a location
+description: Suggest a cache, tool folder or app data location GRUZ should describe.
+labels: [rules]
+body:
+  - type: input
+    id: path
+    attributes:
+      label: Path
+      placeholder: ~/Library/Caches/com.example.tool
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Which app or tool creates it
+    validations:
+      required: true
+  - type: textarea
+    id: contents
+    attributes:
+      label: What is inside, and what happens when it is removed
+      description: Is it a cache the tool rebuilds, downloaded packages, build output, or data that cannot be recreated? Link to documentation if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: clean
+    attributes:
+      label: Official clean command, if any
+      placeholder: tool cache clean

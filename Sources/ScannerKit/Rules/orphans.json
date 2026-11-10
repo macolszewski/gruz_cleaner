@@ -1,0 +1,38 @@
+{
+  "searchDirs": [
+    "~/Library/Containers",
+    "~/Library/Group Containers",
+    "~/Library/Application Support",
+    "~/Library/Caches",
+    "~/Library/Saved Application State",
+    "~/Library/HTTPStorages",
+    "~/Library/WebKit"
+  ],
+  "ignoredIDs": [
+    "org.swift.*",
+    "com.microsoft.VSCode.ShipIt",
+    "*.ShipIt",
+    "com.crashlytics*",
+    "com.google.GoogleUpdater*",
+    "com.google.Keystone*",
+    "com.google.SoftwareUpdate*",
+    "io.sentry*",
+    "com.plausiblelabs.*",
+    "org.sparkle-project.*",
+    "com.openai.atlas*",
+    "us.zoom.*",
+    "com.microsoft.autoupdate*"
+  ],
+  "aliases": {
+    "dev.orbstack": "dev.kdrag0n.MacVirt",
+    "net.whatsapp.WhatsApp.shared": "net.whatsapp.WhatsApp",
+    "dev.warp": "dev.warp.Warp-Stable",
+    "com.openai.codex.notifications": "com.openai.codex",
+    "com.openai.sky.CUAService": "com.openai.codex",
+    "com.termius.mac": "com.termius-dmg.mac",
+    "groups.com.apple.podcasts": "com.apple.podcasts",
+    "us.electronic.mas.macdroid": "us.electronic.mas.macdroid",
+    "com.microsoft.rdc": "com.microsoft.rdc.macos"
+  },
+  "minimumSizeMB": 10
+}
