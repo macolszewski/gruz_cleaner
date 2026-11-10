@@ -4,33 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_call:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # macOS minutes are expensive: one job does everything that needs macOS.
   test:
-    name: Build and test (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        # macos-15 is the oldest supported system; macos-26 is the one release builds are made on.
-        os: [macos-15, macos-26]
-    runs-on: ${{ matrix.os }}
+    name: Build and test
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-
-      # The macos-15 image defaults to an older Xcode; GRUZ needs Xcode 26 (Swift 6.2).
-      - name: Select Xcode 26
-        run: |
-          xcode="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)"
-          if [ -z "$xcode" ]; then echo "Xcode 26 is not installed on this runner"; ls -d /Applications/Xcode*.app; exit 1; fi
-          sudo xcode-select -s "$xcode"
-
-      - name: Toolchain
-        run: swift --version
 
       - name: Build
         run: swift build
@@ -38,24 +23,24 @@ jobs:
       - name: Swift tests
         run: swift test
 
+      - name: Localizations
+        run: ./scripts/check-localizations.py
+
       - name: App bundle
         run: ./scripts/build-app.sh
 
-  checks:
-    name: Python helper and localizations
-    runs-on: macos-26
+  # The helper is plain Python, so it runs on Linux, including the real Chroma rebuild and query test.
+  python:
+    name: claude-mem helper
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v6
 
-      # Same packages as ClaudeMemoryRuntime, so the real Chroma rebuild and query test runs.
       - name: Python helper tests (with real Chroma)
         env:
           CLEANER_TEST_CHROMA: "1"
         run: >
           uv run --no-project --python 3.13 --with "chromadb==1.5.9" --with "onnxruntime>=1.20" --with "protobuf<7"
           python -m unittest discover -s Tests/ClaudeMemoryReindexTests -v
-
-      - name: Localizations
-        run: ./scripts/check-localizations.py

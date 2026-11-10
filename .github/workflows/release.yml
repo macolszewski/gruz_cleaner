@@ -6,18 +6,24 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
-  # The full CI runs on the tagged commit; nothing is published unless all of it passes.
-  ci:
-    uses: ./.github/workflows/ci.yml
-
   release:
     name: Build and publish GRUZ.app
-    needs: ci
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+
+      # Tests already ran when the commit reached main; publish only if that CI run passed,
+      # instead of paying for the macOS tests twice.
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion="$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --json conclusion,status \
+            -q '[.[] | select(.status == "completed")][0].conclusion')"
+          if [ "$conclusion" != "success" ]; then echo "CI has not passed for $GITHUB_SHA (got: ${conclusion:-none})"; exit 1; fi
 
       - name: Build app
         run: VERSION="${GITHUB_REF_NAME#v}" ./scripts/build-app.sh

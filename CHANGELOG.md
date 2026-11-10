@@ -47,8 +47,8 @@ exactly what gets removed, and results must say honestly what happened.
 
 - Faster scans: claimed paths are indexed by ancestor, and app leftovers are sized before Spotlight is
   asked, a few queries at a time.
-- CI tests on macOS 15 and macOS 26, runs the claude-mem helper against a real Chroma, and the release
-  workflow publishes only after the full CI passes on the tagged commit.
+- CI runs the claude-mem helper against a real Chroma, and the release workflow publishes only when CI
+  passed for the tagged commit.
 
 ## [1.0.0]
 
