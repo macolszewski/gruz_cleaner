@@ -58,9 +58,11 @@ enum DockerSource {
                 description: String(localized: "A single disk image file that holds all containers, images, volumes and Linux machines. The items above are part of it. It is not removed as a file: removing images and volumes frees space inside it, and \(app) returns that space to macOS automatically.", bundle: .scannerKit),
                 safety: .userData, sizeBytes: info.allocatedBytes, lastModified: info.newestModification, paths: [path],
                 ownerBundleIDs: app == "OrbStack" ? ["dev.kdrag0n.MacVirt"] : ["com.docker.docker"]
-            ))
+            ).measured(info))
         }
 
+        // Independent queries; the engine identity is needed only if the usage report succeeds.
+        async let engineQuery = engineIdentity()
         let output: CommandOutput
         do {
             output = try await ReadOnlyCommand.run(["docker", "system", "df", "-v", "--format", "{{json .}}"], timeout: 120)
@@ -76,18 +78,52 @@ enum DockerSource {
             await ctx.warnings.add(String(localized: "Docker: unrecognized response format.", bundle: .scannerKit))
             return items
         }
-        return parse(df) + items
+        let engine = await engineQuery
+        if engine == nil {
+            await ctx.warnings.add(String(localized: "Docker: could not identify the engine, so Docker items cannot be removed in this scan.", bundle: .scannerKit))
+        }
+        return parse(df, engine: engine) + items
     }
 
-    static func parse(_ df: SystemDF) -> [ScanItem] {
+    static let engineIdentityCommand = ["docker", "info", "--format", "{{.ID}} {{.Name}}"]
+
+    /// Identifies the engine the CLI talks to. Removal commands run later through the same CLI, whose
+    /// current context may by then point to another engine with objects of the same names.
+    static func engineIdentity() async -> String? {
+        guard let out = try? await ReadOnlyCommand.run(engineIdentityCommand, timeout: 30), out.status == 0 else { return nil }
+        let identity = String(decoding: out.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return identity.isEmpty ? nil : identity
+    }
+
+    /// Without an engine identity the items are shown but cannot be removed.
+    static func parse(_ df: SystemDF, engine: String?) -> [ScanItem] {
+        parse(df).map { bind($0, to: engine) }
+    }
+
+    private static func bind(_ item: ScanItem, to engine: String?) -> ScanItem {
+        var copy = item
+        copy.children = item.children.map { bind($0, to: engine) }
+        guard copy.action != nil else { return copy }
+        if let engine {
+            let check = CommandCheck(argv: engineIdentityCommand, expected: engine, purpose: .dockerEngine)
+            copy.preconditions = [check] + (copy.preconditions ?? [])
+        } else {
+            copy.action = nil
+        }
+        return copy
+    }
+
+    private static func parse(_ df: SystemDF) -> [ScanItem] {
         var items: [ScanItem] = []
         let owner = ["dev.kdrag0n.MacVirt"]
 
         let unusedImages = (df.Images ?? []).filter { $0.Containers == "0" }.map { image -> ScanItem in
             let named = image.Repository != "<none>" && image.Tag != "<none>"
+            // A named image is removed by its tag (an image with several tags cannot be removed by id), so
+            // the tag must still point to the scanned image: a later pull or build moves it to another one.
             let ref = named ? "\(image.Repository):\(image.Tag)" : image.ID
             let shortID = String(image.ID.replacingOccurrences(of: "sha256:", with: "").prefix(12))
-            return ScanItem(
+            var item = ScanItem(
                 id: "docker.image:\(image.ID):\(ref)", category: .docker,
                 title: named ? ref : String(localized: "<unnamed> \(shortID)", bundle: .scannerKit), app: "Docker",
                 description: String(localized: "A Docker image that no container uses. The size counts only its unique part; layers shared with other images stay.", bundle: .scannerKit),
@@ -96,6 +132,10 @@ enum DockerSource {
                 action: .command(argv: ["docker", "image", "rm", ref]), ownerBundleIDs: owner,
                 note: String(localized: "Full image size: \(image.Size)", bundle: .scannerKit)
             )
+            if named {
+                item.preconditions = [CommandCheck(argv: ["docker", "image", "inspect", "--format", "{{.Id}}", ref], expected: image.ID, purpose: .dockerImage)]
+            }
+            return item
         }
         if let group = makeGroup(
             id: "docker.images.unused", title: String(localized: "Images without containers", bundle: .scannerKit),

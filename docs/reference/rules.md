@@ -135,10 +135,10 @@ Choose the level by the worst realistic case for a typical user, not the common 
 |---|---|---|
 | `{ "type": "trash" }` | Moves each path to the Trash. | no |
 | `{ "type": "permanentDelete" }` | Removes each path, bypassing the Trash. | yes |
-| `{ "type": "command", "argv": [...] }` | Runs an allow-listed command once. | yes |
+| `{ "type": "command", "argv": [...] }` | Runs an allow-listed command once. An argument `{path}` is replaced by the matched path, so the command acts on exactly the folder that was measured. | yes |
 | absent | Informational item. | |
 
-Prefer `trash`. The user can still switch a Trash item to "Skip Trash" in the review sheet. Use a `command` when the tool has an official cleanup command that does better than removing the folder, for example `uv cache clean` (`uv` keeps its cache consistent) or `docker builder prune --force`. Every `argv` must match `CommandPolicy` exactly; the allowed commands are listed in [architecture.md](architecture.md#safety-model). Adding a new command means changing `CommandPolicy` and its tests, which is a deliberate code review step, not a catalog edit.
+Prefer `trash`. The user can still switch a Trash item to "Skip Trash" in the review sheet. Use a `command` when the tool has an official cleanup command that does better than removing the folder, for example `uv cache clean --cache-dir {path}` (`uv` keeps its cache consistent, and the explicit folder stops it from cleaning a cache configured elsewhere) or `docker builder prune --force`. Every `argv` must match `CommandPolicy` exactly; the allowed commands are listed in [architecture.md](architecture.md#safety-model). Adding a new command means changing `CommandPolicy` and its tests, which is a deliberate code review step, not a catalog edit.
 
 Permanent actions are marked on the item and confirmed by an extra alert before they run.
 
@@ -194,6 +194,7 @@ Artifacts are folders inside the user's project folders that a build or install 
 | `dirNames` | yes | | Folder names to look for. |
 | `siblingsAny` | no | `[]` | At least one entry next to the folder must match one of these globs. |
 | `insideAny` | no | `[]` | At least one entry inside the folder must match one of these globs. |
+| `insideNone` | no | `[]` | No entry inside the folder may match one of these globs (source files that show it is not output). |
 | `parentName` | no | none | Required name of the parent folder. |
 | `title` | yes | | Group title in the Projects category. |
 | `description` | yes | | What the folder contains. |
@@ -203,7 +204,9 @@ Artifacts are folders inside the user's project folders that a build or install 
 | `childrenAreItems` | no | `false` | The found folder is a container; each subfolder becomes an item (agent worktrees). |
 | `gitStatusCheck` | no | `false` | Run `git status --porcelain` on each item and show the result in its note. |
 
-The context conditions are what make a name match trustworthy. `bin` is a .NET build folder only next to a project file; elsewhere it may hold scripts. `build` is build output next to `pubspec.yaml`, `build.gradle` or `CMakeLists.txt`, but may be source code elsewhere. Always add a sibling or inside condition unless the name is unambiguous (`__pycache__`, `.mypy_cache`).
+The context conditions are what make a name match trustworthy. `bin` is a .NET build folder only next to a project file; elsewhere it may hold scripts. `build` is build output next to `pubspec.yaml`, `build.gradle` or `CMakeLists.txt`, but may be source code elsewhere, and even next to `pyproject.toml` it may be a Python package named `build`; that is why `artifact.flutter-build` also requires generated files inside (`insideAny`) and no source files (`insideNone`). Always add a sibling or inside condition unless the name is unambiguous (`__pycache__`, `.mypy_cache`).
+
+A typical location or folder name is not proof that everything in it can be recreated. Before marking a rule `safe` or `regenerable`, check what else the tool keeps there: JetBrains stores Local History in its cache folder, Maven keeps locally installed artifacts next to downloaded ones, and Hugging Face keeps the login token next to its model cache. Point the rule at the disposable subfolders, lower the safety level, or protect the rest in `Denylist`.
 
 When a folder name matches but no definition's conditions hold, the walk still does not descend into it, unless some definition with that name uses `parentName`. `artifact.rust-target` is special: matching folders are handed to the Rust analysis ([rust.md](../guide/rust.md)).
 

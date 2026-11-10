@@ -31,6 +31,10 @@ space after a removal. The item sizes are still estimates of what removal frees:
 ## What GRUZ cannot see
 
 - **Without Full Disk Access**, the Trash, Mail, Messages and iPhone backups are not measured.
+- **Unreadable contents.** When part of a folder cannot be read, its item is marked as partly measured
+  and its real size may be larger. A location that cannot be read at all is not shown.
+- **Symbolic links.** A location reached through a symbolic link folder (for example a cache folder
+  that links elsewhere) is not offered for removal, because the rule never saw what is really there.
 - **Docker data is visible only while Docker runs.** GRUZ reads it through the `docker` CLI. If
   Docker Desktop or OrbStack is not running, only the VM disk image is shown.
 - **Docker data is removed only through the `docker` CLI**, one image, container or volume at a time.
@@ -49,6 +53,10 @@ space after a removal. The item sizes are still estimates of what removal frees:
 - **Version rules** (Playwright browsers, Node.js under nvm, Flutter SDKs under FVM, JetBrains
   settings) keep the newest version and offer older ones. GRUZ cannot tell which version a project
   still uses.
+- **App leftovers need Spotlight.** When Spotlight does not answer, possible leftovers are not shown
+  at all and the scan says how many were skipped.
+- **Agent worktree status** comes from `git status`. GRUZ disables the fsmonitor hook and optional
+  locks, but Git may still run clean filters configured for the repository (Git LFS, for example).
 - **Age** is the newest modification time inside an item. A folder that is read often but never
   written can look old.
 

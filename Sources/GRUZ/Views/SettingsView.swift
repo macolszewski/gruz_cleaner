@@ -63,7 +63,13 @@ struct ScanSettingsView: View {
                 ForEach(settings.projectRoots, id: \.self) { root in
                     HStack {
                         Image(systemName: "folder")
-                        Text(root).font(.body.monospaced())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(root).font(.body.monospaced())
+                            if let why = Self.outsideAllowedArea(root) {
+                                Text("Nothing in this folder can be removed: \(why)")
+                                    .font(.caption).foregroundStyle(.orange)
+                            }
+                        }
                         Spacer()
                         Button(role: .destructive) {
                             settings.projectRoots.removeAll { $0 == root }
@@ -89,10 +95,17 @@ struct ScanSettingsView: View {
 
             Section {
                 Button("Scan Again with New Settings") { model.scan() }
-                    .disabled(model.isScanning)
+                    .disabled(!model.canScan)
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Why artifacts inside `root` would be refused by the denylist (for example, under ~/Documents), if they would.
+    static func outsideAllowedArea(_ root: String) -> String? {
+        let probe = Paths.join(Paths.expand(root), "node_modules")
+        if case .denied(let why) = Denylist().check(probe) { return why }
+        return nil
     }
 
     private func addRoot() {

@@ -71,6 +71,8 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
     public var siblingsAny: [String]
     /// At least one entry inside the directory must match (empty means no requirement).
     public var insideAny: [String]
+    /// No entry inside the directory may match (source files that show the folder is not build output).
+    public var insideNone: [String]
     /// Required name of the parent directory.
     public var parentName: String?
     public var title: String
@@ -83,7 +85,7 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
     public var gitStatusCheck: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case id, dirNames, siblingsAny, insideAny, parentName, title, description, regeneration, safety, action
+        case id, dirNames, siblingsAny, insideAny, insideNone, parentName, title, description, regeneration, safety, action
         case childrenAreItems, gitStatusCheck
     }
 
@@ -93,6 +95,7 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
         dirNames = try c.decode([String].self, forKey: .dirNames)
         siblingsAny = try c.decodeIfPresent([String].self, forKey: .siblingsAny) ?? []
         insideAny = try c.decodeIfPresent([String].self, forKey: .insideAny) ?? []
+        insideNone = try c.decodeIfPresent([String].self, forKey: .insideNone) ?? []
         parentName = try c.decodeIfPresent(String.self, forKey: .parentName)
         title = try c.decode(String.self, forKey: .title)
         description = try c.decode(String.self, forKey: .description)

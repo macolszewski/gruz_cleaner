@@ -3,7 +3,7 @@
     "title": "Cache pakietów Pythona (uv)",
     "description": "Pobrane i rozpakowane paczki Pythona, z których uv tworzy środowiska .venv. Na APFS uv klonuje pliki do .venv, więc realnie zwolni się mniej, niż pokazuje rozmiar.",
     "regeneration": "uv pobierze paczki ponownie przy następnej instalacji.",
-    "note": "Wykonywane przez oficjalne polecenie uv cache clean."
+    "note": "Wykonuje uv cache clean dokładnie na tym katalogu."
   },
   "npm.cacache": {
     "title": "Cache paczek npm",
@@ -126,8 +126,8 @@
   },
   "maven.repository": {
     "title": "Lokalne repozytorium Maven",
-    "description": "Pobrane biblioteki Javy.",
-    "regeneration": "mvn pobierze je ponownie."
+    "description": "Biblioteki Javy pobrane przez Mavena oraz artefakty zainstalowane lokalnie (mvn install, install:install-file). Lokalnie zainstalowane artefakty mogą nie istnieć nigdzie indziej.",
+    "regeneration": "Maven pobierze publiczne biblioteki ponownie. Twoje własne artefakty wrócą dopiero po ich ponownym zbudowaniu lub zainstalowaniu."
   },
   "uv.tools": {
     "title": "Narzędzia i Pythony zainstalowane przez uv",
@@ -240,7 +240,7 @@
   },
   "huggingface.models": {
     "title": "Modele Hugging Face",
-    "description": "Modele pobrane z Hugging Face (np. Whisper dla superwhisper i MLX, modele pyannote i speechbrain do rozpoznawania mówców). Pliki modeli są współdzielone w jednym magazynie, więc katalog usuwa się w całości.",
+    "description": "Modele i zbiory danych pobrane z Hugging Face (np. Whisper dla superwhisper i MLX, modele pyannote i speechbrain do rozpoznawania mówców). Pliki są współdzielone w obrębie magazynu, więc magazyn usuwa się w całości. Token logowania leży obok i zostaje.",
     "regeneration": "Program pobierze model ponownie przy następnym użyciu (często kilka GB)."
   },
   "torch.cache": {
@@ -329,7 +329,7 @@
   },
   "jetbrains.caches": {
     "title": "Cache i indeksy IDE JetBrains",
-    "description": "Indeksy projektów, cache kompilacji i pobrane zasoby Ridera, PyCharma, DataGripa i innych IDE JetBrains, osobno dla każdego IDE.",
+    "description": "Indeksy projektów, cache kompilacji i pobrane zasoby Ridera, PyCharma, DataGripa i innych IDE JetBrains. Lokalna historia (Local History), która leży w tym samym katalogu, nigdy nie jest uwzględniana.",
     "regeneration": "IDE przeindeksuje projekty przy otwarciu (kilka minut)."
   },
   "jetbrains.logs": {
@@ -338,11 +338,11 @@
   },
   "jetbrains.old-config": {
     "title": "Ustawienia starszych wersji IDE JetBrains",
-    "description": "Ustawienia, wtyczki i lokalna historia wcześniejszych wersji IDE. Nowsza wersja zaimportowała je przy pierwszym uruchomieniu; najnowsza wersja każdego IDE zostaje."
+    "description": "Ustawienia i wtyczki wcześniejszych wersji IDE. Nowsza wersja zaimportowała je przy pierwszym uruchomieniu; najnowsza wersja każdego IDE zostaje."
   },
   "jetbrains.config": {
     "title": "Ustawienia i wtyczki IDE JetBrains",
-    "description": "Ustawienia, wtyczki, lokalna historia zmian i konsole baz danych aktualnych wersji IDE JetBrains."
+    "description": "Ustawienia, wtyczki i konsole baz danych aktualnych wersji IDE JetBrains."
   },
   "vscode.cache": {
     "title": "Cache Visual Studio Code",
@@ -450,7 +450,7 @@
   },
   "artifact.flutter-build": {
     "title": "Katalogi build",
-    "description": "Wyniki budowania (Flutter, Gradle, CMake, Python).",
+    "description": "Wyniki budowania (Flutter, Gradle, CMake, Python). Katalog jest brany pod uwagę tylko wtedy, gdy zawiera typowe pliki wygenerowane przez narzędzie budujące i nie zawiera kodu źródłowego.",
     "regeneration": "Ponowny build projektu."
   },
   "artifact.dart_tool": {

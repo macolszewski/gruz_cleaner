@@ -39,7 +39,7 @@ struct ContentView: View {
                 } label: {
                     Label("Scan", systemImage: "arrow.clockwise")
                 }
-                .disabled(model.showingClaudeMemory ? model.claudeMemory.isLoading || model.claudeMemory.isRunning : model.isScanning)
+                .disabled(model.showingClaudeMemory ? model.claudeMemory.isLoading || model.claudeMemory.isRunning : !model.canScan)
                 .help("Scan again (⌘R). Scanning only reads data.")
             }
         }

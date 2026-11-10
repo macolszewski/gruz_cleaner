@@ -46,9 +46,9 @@ A location must be reported once, by the most specific source. `ClaimRegistry` (
 
 ### Sources in more detail
 
-**Project artifacts.** `ProjectSource` walks the configured project folders with `fts`, without following symlinks or crossing volumes, up to 12 levels deep. It skips `.git`, `~/Library` and hidden folders other than artifact names and `.claude`. A folder name alone is not enough: each artifact definition has context conditions (`node_modules` next to `package.json`, `bin`/`obj` next to a `*.csproj`, `.venv` containing `pyvenv.cfg`, `build` next to `pubspec.yaml`, `build.gradle`, `CMakeLists.txt` and similar). Without the context check, a `bin` folder with scripts or a `build` folder with sources would be offered for removal. The walk does not descend into a recognized artifact.
+**Project artifacts.** `ProjectSource` walks the configured project folders with `fts`, without following symlinks or crossing volumes, up to 12 levels deep. It skips `.git`, `~/Library` and hidden folders other than artifact names and `.claude`. A folder name alone is not enough: each artifact definition has context conditions (`node_modules` next to `package.json`, `bin`/`obj` next to a `*.csproj`, `.venv` containing `pyvenv.cfg`, `build` next to `pubspec.yaml`, `build.gradle`, `CMakeLists.txt` and similar). A `build` folder must also contain files a build tool generates (`CMakeCache.txt`, `intermediates`, `bdist.*` and similar) and no source files at its top level, because a Python package may itself be called `build`. Without the context check, a `bin` folder with scripts or a `build` folder with sources would be offered for removal. The walk does not descend into a recognized artifact.
 
-Agent worktrees (`.claude/worktrees/*`) are listed one per worktree with a `git status --porcelain` summary in the item note, because a worktree may hold uncommitted work.
+Agent worktrees (`.claude/worktrees/*`) are listed one per worktree with a `git status --porcelain` summary in the item note, because a worktree may hold uncommitted work. Git runs with `--no-optional-locks`, `core.fsmonitor=false` and `core.untrackedCache=false`, so a read-only scan neither starts a configured fsmonitor program nor rewrites the index.
 
 **Project folders.** By default the scan uses whichever of `~/Developer`, `~/workspace`, `~/Projects`, `~/code`, `~/src`, `~/dev`, `~/repos` exist, or `~/Developer` when none does. The list is editable in Settings. The project folders themselves are always protected by the denylist; only artifacts inside them can be removed.
 
@@ -58,6 +58,8 @@ Agent worktrees (`.claude/worktrees/*`) are listed one per worktree with a `git 
 - one identifier is a dot-separated prefix of the other;
 - `aliases` in `orphans.json` maps it to an installed app (needed because, for example, OrbStack's app identifier is `dev.kdrag0n.MacVirt` while its data folder is `dev.orbstack`);
 - Spotlight (`mdfind`) finds an app with that identifier outside the usual folders.
+
+Folders below `minimumSizeMB` are dropped before Spotlight is asked, and the queries run a few at a time. When Spotlight fails or times out, the folder is not reported at all and the scan shows a warning: not knowing whether an app exists is no evidence that it is gone.
 
 Identifiers starting with `com.apple.` and those matching `ignoredIDs` are never reported. Orphans below `minimumSizeMB` are hidden. Every orphan is `caution` and moves to the Trash: matching by identifier is a heuristic, and an app installed in an unusual place could be missed.
 
@@ -75,7 +77,9 @@ Removal is designed so that a mistake requires several independent failures.
    - whole subtrees: `/System`, `/usr`, `/bin`, `/sbin`, `/etc`, `~/Documents`, `~/Desktop`, `~/Pictures`, `~/Library/Keychains`, `~/Library/Mobile Documents`, `~/Library/CloudStorage`, `~/Library/Mail`, `~/Library/Messages`, `~/Library/Photos`, `~/.ssh`, `~/.gnupg` and others;
    - any path with a `.git` component;
    - anything outside the allowed roots (the home folder, `/private/var/folders`, `/var/folders` and the Homebrew Android SDK folder);
-   - paths whose parent folders are symlinks that resolve into a protected place.
+   - paths with a symbolic link anywhere between the home (or temporary) folder and the item: `~/.npm/_npx` linked to a project's `src` folder would otherwise turn source files into "npx cache". Rule globs skip such matches during the scan too;
+   - paths whose parent folders are symlinks that resolve into a protected place;
+   - data that cannot be recreated but lives inside disposable folders, and every folder that contains it: JetBrains Local History in `~/Library/Caches/JetBrains/<IDE>/LocalHistory` and the Hugging Face login token in `~/.cache/huggingface`. A broad rule such as "other app caches" therefore cannot take them along with their parent.
 
    Removable rule paths that hit the denylist are dropped during the scan, a unit test checks every removable rule path against it, and `CleaningExecutor` checks it again right before running.
 3. **Nothing is preselected.** Only leaves with an action, outside `userData` and informational categories, are selectable (`ScanItem.isSelectable`). There is no "clean everything" shortcut. Items hidden by a filter are never acted on, even if they were selected earlier.
@@ -83,9 +87,10 @@ Removal is designed so that a mistake requires several independent failures.
 5. **Trash by default.** Path actions move items to the Trash with `FileManager.trashItem`, so a mistake can be undone.
 6. **Permanent deletion is visible and confirmed twice.** Items whose action is `permanentDelete` or a command (Docker, `xcrun simctl delete`, `uv cache clean` and similar) are marked as permanent in the list and shown in a separate section of the review sheet with the exact command. The user can also switch a Trash item to "Skip Trash" in the review sheet. Running a plan with any permanent operation requires an extra confirmation alert; without it, those operations are skipped.
 7. **Owner app must be closed.** Rules with `requiresAppClosed` list `ownerBundleIDs`. If one of these apps is running, the operation is blocked and the review sheet says which app to quit.
-8. **Command allow-list.** `CommandPolicy` (`Sources/ScannerKit/Support/CommandPolicy.swift`) is an exhaustive list of argv patterns. Clean commands: `docker image|volume|container rm <name>`, `docker builder prune --force`, `xcrun simctl delete <udid>`, `uv cache clean`, `uv cache prune`, `npm cache clean --force`, `brew cleanup --prune=all`, `dotnet nuget locals all --clear`. Operands may not start with `-`. Rules with other commands fail to load, and the executor refuses them again. Read-only commands have a separate list used by the scanner.
-9. **Re-validation before running.** Blockers are computed when the review sheet opens, can be refreshed, and are computed again for every operation just before it runs. A path that no longer exists is reported, not recreated or guessed. Rust artifacts have additional checks ([rust.md](../guide/rust.md)).
-10. **Operation log.** Every confirmed operation, including skipped and failed ones, is appended as one JSON line to `~/Library/Logs/GRUZ/operations.log` (time, item, size, action with exact paths or command, status).
+8. **Command allow-list.** `CommandPolicy` (`Sources/ScannerKit/Support/CommandPolicy.swift`) is an exhaustive list of argv patterns. Clean commands: `docker image|volume|container rm <name>`, `docker builder prune --force`, `xcrun simctl delete <udid>`, `uv cache clean --cache-dir <folder>`, `npm cache clean --force`, `brew cleanup --prune=all`, `dotnet nuget locals all --clear`. Operands may not start with `-`. Rules with other commands fail to load, and the executor refuses them again. A command that acts on a folder (`uv cache clean --cache-dir`) passes the same denylist check as removing that folder. Read-only commands have a separate list used by the scanner and by the checks below.
+9. **Re-validation before running.** Blockers are computed when the review sheet opens, can be refreshed, and are computed again for every operation just before it runs. A path that no longer exists is reported, not recreated or guessed. Commands can carry read-only checks (`CommandCheck`) whose output must still match the scan: every Docker command checks that the CLI talks to the engine that was scanned, and a named image is removed only while its tag still points to the scanned image id. Rust artifacts have additional checks ([rust.md](../guide/rust.md)).
+10. **Operation log.** Every confirmed operation, including skipped, failed and partly done ones, is appended as one JSON line to `~/Library/Logs/GRUZ/operations.log` (time, item, size, action with exact paths or command, status with the paths that failed, command output). The executor writes a line before the first operation; if the log cannot be written, nothing runs.
+11. **Honest results.** An operation with several paths where only some could be removed is reported as partly done, never as done; the paths that remain stay in the list. External commands have a deadline (30 minutes for cleanup commands) and bounded output buffers, a command stopped at the deadline is reported as failed with a note that part of the data may already be gone, and the app refuses to quit or scan while a removal runs.
 
 After a run, the result sheet shows each operation's status and the measured change in free space on the volume, which is more honest than the sum of estimated sizes.
 
@@ -104,6 +109,8 @@ Docker Desktop and OrbStack keep all images, containers, volumes and Linux machi
 
 If Docker is not running, the scan adds a warning and shows only the disk image.
 
+**Binding to the engine.** The scan records which engine answered (`docker info --format '{{.ID}} {{.Name}}'`). Removal runs later through the same CLI, whose current context may by then point to another engine, for example a remote server with a volume of the same name. Each Docker command therefore repeats that check right before it runs and is skipped when the answer differs. If the engine cannot be identified during the scan, Docker items are shown but cannot be selected. Named images are removed by tag (an image with several tags cannot be removed by id), after checking that `docker image inspect` still returns the scanned image id for that tag.
+
 ## Size measurement
 
 `SizeCalculator` walks trees with `fts`, without following symlinks or crossing volumes, and sums allocated blocks (`st_blocks * 512`, what `du` reports) rather than logical sizes. Hard links are counted once per measurement. The numbers are still estimates of what removal frees:
@@ -112,6 +119,8 @@ If Docker is not running, the scan adds a warning and shows only the disk image.
 - **Hard links** are deduplicated within one item, not across items. A file linked from two items is counted in both.
 - **Docker** sizes come from Docker's own report and may overlap.
 - **The Trash** frees nothing until it is emptied, and the Trash is on the same volume.
+
+Entries that cannot be read (no permission, an I/O error) are counted. An item with unreadable contents is marked as partly measured in its detail panel, and it is left out of the "What grew" history, because once it can be read in full it would look like growth.
 
 The UI labels sizes as estimates, and the result sheet reports the measured change in free space.
 

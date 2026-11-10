@@ -5,7 +5,8 @@ import Foundation
 public enum Paths {
     public static var home: String { NSHomeDirectory() }
 
-    public static var userTempDir: String { confstrPath(_CS_DARWIN_USER_TEMP_DIR) ?? NSTemporaryDirectory() }
+    /// Fixed for the life of the process, so it is read once.
+    public static let userTempDir: String = confstrPath(_CS_DARWIN_USER_TEMP_DIR) ?? NSTemporaryDirectory()
 
     public static var userCacheDir: String? { confstrPath(_CS_DARWIN_USER_CACHE_DIR) }
 
@@ -46,8 +47,12 @@ public enum Paths {
         Darwin.fnmatch(pattern, name, 0) == 0
     }
 
-    /// Expands a path pattern whose components may contain globs. Does not follow symlinked directories.
-    /// Hidden entries match only patterns that start with a dot. Results are sorted.
+    /// Expands a path pattern whose components may contain globs. Hidden entries match only patterns
+    /// that start with a dot. Results are sorted.
+    ///
+    /// Below the home folder (or the temporary folder) a match is dropped when one of its ancestors is a
+    /// symbolic link: `~/.npm/_npx -> ~/code/app/src` must not turn source files into "npx cache".
+    /// The match itself may be a link; removing a link never touches its target.
     public static func glob(_ pattern: String, home: String = Paths.home) -> [String] {
         let expanded = expand(pattern, home: home)
         let components = expanded.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
@@ -69,7 +74,32 @@ public enum Paths {
             current = next
             if current.isEmpty { break }
         }
-        return components.isEmpty ? [] : current
+        guard !components.isEmpty else { return [] }
+        return current.filter { !hasSymlinkedAncestor($0, home: home) }
+    }
+
+    /// The folder below which every path component must be a real directory: the home folder, the
+    /// user's temporary folder, or nil for other locations. Symlinks above it (such as `/var`) are system ones.
+    private static func trustedAnchor(of path: String, home: String) -> String? {
+        [home, userTempDir, "/private" + userTempDir].first { path != $0 && isWithin(path, $0) }
+    }
+
+    /// True when a component between the trusted anchor and `path` (exclusive) is a symbolic link.
+    public static func hasSymlinkedAncestor(_ path: String, home: String = Paths.home) -> Bool {
+        guard let anchor = trustedAnchor(of: path, home: home) else { return false }
+        return ancestors(of: path).prefix { $0 != anchor && isWithin($0, anchor) }.contains(where: isSymlink)
+    }
+
+    /// Proper ancestors of an absolute path, nearest first, ending with "/".
+    public static func ancestors(of path: String) -> [String] {
+        var result: [String] = []
+        var p = path
+        while true {
+            let parent = (p as NSString).deletingLastPathComponent
+            if parent == p || parent.isEmpty { return result }
+            result.append(parent)
+            p = parent
+        }
     }
 
     public static func join(_ base: String, _ name: String) -> String {

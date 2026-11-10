@@ -64,6 +64,11 @@ struct ItemDetail: View {
                 section("Notes") { Text(note) }
             }
 
+            if item.hasUnreadableContents {
+                Label("Some contents could not be read, so the real size may be larger.", systemImage: "eye.slash")
+                    .foregroundStyle(.orange)
+            }
+
             if item.requiresAppClosed {
                 Label("Quit the app that owns this data before removing it.", systemImage: "xmark.app")
                     .foregroundStyle(.orange)

@@ -81,7 +81,8 @@ final class AppModel {
     // MARK: Scanning
 
     func scan() {
-        guard let catalog, !isScanning, !isDemo else { return }
+        // A scan during removal would show items that are being removed and could be selected again.
+        guard let catalog, canScan, !isDemo else { return }
         refreshFullDiskAccess()
         isScanning = true
         activeStages = []
@@ -241,29 +242,45 @@ final class AppModel {
         return .live(projectRoots: settings.projectRoots)
     }
 
+    /// True while removing data; quitting must wait.
+    var isBusy: Bool { isCleaning || claudeMemory.isRunning }
+
+    /// A new scan may start: none is running and nothing is being removed.
+    var canScan: Bool { !isScanning && !isCleaning }
+
     func execute(_ plan: CleaningPlan, confirmation: CleaningConfirmation) async -> CleaningReport {
         guard !isDemo else { return CleaningReport() }
+        guard !isCleaning, !isScanning else {
+            return .skippingAll(plan, reason: String(localized: "Wait until the scan finishes, then review the selection again."))
+        }
         isCleaning = true
         let report = await executor.execute(plan, confirmation: confirmation)
         isCleaning = false
-        let done = Set(report.results.compactMap { r -> String? in
-            if case .done = r.status { return r.operation.id }
-            return nil
-        })
-        selection.subtract(done)
+        // Done items leave the list; a partly removed one stays, reduced to the paths still on disk.
+        var done: Set<String> = []
+        var remaining: [String: [String]] = [:]
+        for r in report.results {
+            switch r.status {
+            case .done: done.insert(r.operation.id)
+            case .partial: remaining[r.operation.id] = r.remainingPaths
+            case .skipped, .failed: break
+            }
+        }
+        selection.subtract(done.union(remaining.keys))
         forcePermanent.subtract(done)
         if var current = result {
-            current.items = current.items.compactMap { removing(done, from: $0) }
+            current.items = current.items.compactMap { applying(done: done, remaining: remaining, to: $0) }
             result = current
         }
         return report
     }
 
-    private func removing(_ ids: Set<String>, from item: ScanItem) -> ScanItem? {
-        if ids.contains(item.id) { return nil }
-        guard item.isGroup else { return item }
+    private func applying(done: Set<String>, remaining: [String: [String]], to item: ScanItem) -> ScanItem? {
+        if done.contains(item.id) { return nil }
         var copy = item
-        copy.children = item.children.compactMap { removing(ids, from: $0) }
+        if let paths = remaining[item.id] { copy.paths = paths }
+        guard item.isGroup else { return copy }
+        copy.children = item.children.compactMap { applying(done: done, remaining: remaining, to: $0) }
         if copy.children.isEmpty { return nil }
         copy.sizeBytes = copy.children.reduce(0) { $0 + $1.sizeBytes }
         return copy

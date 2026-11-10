@@ -23,11 +23,20 @@
     "category": "apps",
     "app": "JetBrains",
     "title": "JetBrains IDE caches and indexes",
-    "description": "Project indexes, compilation caches and downloaded resources of Rider, PyCharm, DataGrip and other JetBrains IDEs, one folder per IDE.",
+    "description": "Project indexes, compilation caches and downloaded resources of Rider, PyCharm, DataGrip and other JetBrains IDEs. Local History, which lives in the same folder, is never included.",
     "regeneration": "The IDE reindexes projects when you open them (a few minutes).",
     "safety": "safe",
     "paths": [
-      "~/Library/Caches/JetBrains/*"
+      "~/Library/Caches/JetBrains/*/caches",
+      "~/Library/Caches/JetBrains/*/index",
+      "~/Library/Caches/JetBrains/*/jcef_cache",
+      "~/Library/Caches/JetBrains/*/tmp",
+      "~/Library/Caches/JetBrains/*/compile-server",
+      "~/Library/Caches/JetBrains/*/vcs-log",
+      "~/Library/Caches/JetBrains/*/conversion",
+      "~/Library/Caches/JetBrains/*/frameworks",
+      "~/Library/Caches/JetBrains/*/external_build_system",
+      "~/Library/Caches/JetBrains/*/full-line"
     ],
     "group": true,
     "action": {
@@ -41,7 +50,8 @@
       "com.jetbrains.intellij",
       "com.jetbrains.WebStorm",
       "com.jetbrains.toolbox"
-    ]
+    ],
+    "childTitle": "parentAndName"
   },
   {
     "id": "jetbrains.logs",
@@ -63,7 +73,7 @@
     "category": "apps",
     "app": "JetBrains",
     "title": "Settings of older JetBrains IDE versions",
-    "description": "Settings, plugins and local history of earlier IDE versions. The newer version imported them on its first launch; the newest version of each IDE is kept.",
+    "description": "Settings and plugins of earlier IDE versions. The newer version imported them on its first launch; the newest version of each IDE is kept.",
     "safety": "caution",
     "kind": "versions",
     "paths": [
@@ -79,7 +89,7 @@
     "category": "apps",
     "app": "JetBrains",
     "title": "JetBrains IDE settings and plugins",
-    "description": "Settings, plugins, local history and database consoles of the current JetBrains IDE versions.",
+    "description": "Settings, plugins and database consoles of the current JetBrains IDE versions.",
     "safety": "userData",
     "paths": [
       "~/Library/Application Support/JetBrains"

@@ -6,16 +6,22 @@ public struct SizeInfo: Sendable, Equatable {
     public var allocatedBytes: Int64
     public var newestModification: Date?
     public var fileCount: Int
+    /// Entries that could not be read (no permission, I/O error); the real size may be larger.
+    public var unreadableCount: Int
 
-    public init(allocatedBytes: Int64 = 0, newestModification: Date? = nil, fileCount: Int = 0) {
+    public init(allocatedBytes: Int64 = 0, newestModification: Date? = nil, fileCount: Int = 0, unreadableCount: Int = 0) {
         self.allocatedBytes = allocatedBytes
         self.newestModification = newestModification
         self.fileCount = fileCount
+        self.unreadableCount = unreadableCount
     }
+
+    public var isPartial: Bool { unreadableCount > 0 }
 
     public mutating func merge(_ other: SizeInfo) {
         allocatedBytes += other.allocatedBytes
         fileCount += other.fileCount
+        unreadableCount += other.unreadableCount
         if let o = other.newestModification, o > (newestModification ?? .distantPast) { newestModification = o }
     }
 }
@@ -31,7 +37,10 @@ public enum SizeCalculator {
         let cPath = strdup(path)
         defer { free(cPath) }
         var argv: [UnsafeMutablePointer<CChar>?] = [cPath, nil]
-        guard let fts = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, nil) else { return info }
+        guard let fts = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, nil) else {
+            info.unreadableCount = 1
+            return info
+        }
         defer { fts_close(fts) }
 
         var visited = 0
@@ -55,6 +64,9 @@ public enum SizeCalculator {
                     if excluding.contains(p) { continue }
                 }
                 if let st = entry.pointee.fts_statp { account(st.pointee, &info, &seenInodes, &newest, isFile: true) }
+            case FTS_DNR, FTS_ERR, FTS_NS:
+                // A path that vanished during the scan is simply gone; anything else was not measured.
+                if entry.pointee.fts_errno != ENOENT { info.unreadableCount += 1 }
             default:
                 break
             }
@@ -76,22 +88,7 @@ public enum SizeCalculator {
 
     /// Measures several roots concurrently.
     public static func measureAll(_ paths: [String], excluding: Set<String> = []) async -> [String: SizeInfo] {
-        await withTaskGroup(of: (String, SizeInfo).self) { group in
-            var results: [String: SizeInfo] = [:]
-            var iterator = paths.makeIterator()
-            let width = max(2, ProcessInfo.processInfo.activeProcessorCount)
-            func addNext() -> Bool {
-                guard let p = iterator.next() else { return false }
-                group.addTask { (p, measure(p, excluding: excluding)) }
-                return true
-            }
-            for _ in 0..<width where !addNext() { break }
-            for await (p, info) in group {
-                results[p] = info
-                _ = addNext()
-            }
-            return results
-        }
+        await concurrentMap(paths, width: max(2, ProcessInfo.processInfo.activeProcessorCount)) { measure($0, excluding: excluding) }
     }
 }
 

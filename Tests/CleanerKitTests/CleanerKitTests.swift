@@ -8,9 +8,18 @@ final class FakeFiles: FileOperations, @unchecked Sendable {
     private let lock = NSLock()
     private(set) var trashed: [String] = []
     private(set) var deleted: [String] = []
+    /// Paths whose removal fails, as with a file the user has no permission to move.
+    var failing: Set<String> = []
 
-    func moveToTrash(_ path: String) throws { lock.withLock { trashed.append(path) } }
-    func removePermanently(_ path: String) throws { lock.withLock { deleted.append(path) } }
+    func moveToTrash(_ path: String) throws {
+        if failing.contains(path) { throw CocoaError(.fileWriteNoPermission) }
+        lock.withLock { trashed.append(path) }
+    }
+
+    func removePermanently(_ path: String) throws {
+        if failing.contains(path) { throw CocoaError(.fileWriteNoPermission) }
+        lock.withLock { deleted.append(path) }
+    }
 }
 
 final class FakeCommands: CommandRunning, @unchecked Sendable {
@@ -19,9 +28,12 @@ final class FakeCommands: CommandRunning, @unchecked Sendable {
 
     func locate(_ tool: String) -> String? { "/fake/bin/\(tool)" }
 
+    /// Output of read-only checks, by arguments joined with spaces.
+    var outputs: [String: String] = [:]
+
     func run(executable: String, arguments: [String]) async throws -> (status: Int32, output: String) {
         lock.withLock { calls.append([executable] + arguments) }
-        return (0, "")
+        return (0, outputs[arguments.joined(separator: " ")] ?? "")
     }
 }
 
@@ -33,7 +45,17 @@ struct FakeApps: RunningAppsChecking {
 final class FakeLog: OperationLogging, @unchecked Sendable {
     private let lock = NSLock()
     private(set) var lines: [String] = []
-    func record(_ line: String) { lock.withLock { lines.append(line) } }
+    var isWritable = true
+
+    func record(_ line: String) throws {
+        guard isWritable else { throw CocoaError(.fileWriteVolumeReadOnly) }
+        lock.withLock { lines.append(line) }
+    }
+
+    /// Entries describing operations, without the line that opens each plan.
+    var operations: [[String: String]] {
+        lines.compactMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: String] }.filter { $0["item"] != nil }
+    }
 }
 
 struct FakeSpace: FreeSpaceProviding {
@@ -114,7 +136,89 @@ struct TestEnvironment {
         #expect(h.files.trashed == [path])
         #expect(h.files.deleted.isEmpty)
         #expect(report.doneCount == 1)
-        #expect(h.log.lines.count == 1)
+        #expect(h.log.operations.count == 1)
+    }
+
+    @Test func partialRemovalIsReportedAndLogged() async throws {
+        let h = try TestEnvironment()
+        let cache = try h.make("Library/Caches/com.example.removedapp")
+        let support = try h.make("Library/Application Support/com.example.removedapp")
+        h.files.failing = [support]
+        let plan = CleaningPlan.make(from: [h.item("orphan", paths: [cache, support], action: .trash)])
+        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: false))
+        #expect(h.files.trashed == [cache])
+        guard case .partial = report.results.first?.status else {
+            Issue.record("expected a partial result")
+            return
+        }
+        #expect(report.results.first?.remainingPaths == [support])
+        #expect(report.doneCount == 0)
+        let entry = try #require(h.log.operations.first)
+        #expect(entry["status"]?.hasPrefix("partial:") == true)
+        #expect(entry["status"]?.contains("Application Support") == true)
+    }
+
+    @Test func nothingRunsWhenTheLogCannotBeWritten() async throws {
+        let h = try TestEnvironment()
+        h.log.isWritable = false
+        let path = try h.make("Library/Caches/a")
+        let plan = CleaningPlan.make(from: [h.item("a", paths: [path], action: .trash)])
+        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: false))
+        #expect(h.files.trashed.isEmpty)
+        guard case .skipped = report.results.first?.status else {
+            Issue.record("expected a skip")
+            return
+        }
+    }
+
+    @Test func dockerCommandsRunOnlyAgainstTheScannedEngine() async throws {
+        let h = try TestEnvironment()
+        let infoArgs = ["info", "--format", "{{.ID}} {{.Name}}"]
+        var item = h.item("vol", paths: [], action: .command(argv: ["docker", "volume", "rm", "shop_db"]))
+        item.preconditions = [CommandCheck(argv: ["docker"] + infoArgs, expected: "engine-1 orbstack", purpose: .dockerEngine)]
+        let plan = CleaningPlan.make(from: [item])
+        let confirmation = CleaningConfirmation(planID: plan.id, permanentConfirmed: true)
+
+        // The CLI context was switched to another engine after the scan.
+        h.commands.outputs[infoArgs.joined(separator: " ")] = "engine-2 remote\n"
+        let refused = await h.executor().execute(plan, confirmation: confirmation)
+        guard case .skipped = refused.results.first?.status else {
+            Issue.record("expected a skip")
+            return
+        }
+        #expect(!h.commands.calls.contains { $0.contains("rm") })
+
+        h.commands.outputs[infoArgs.joined(separator: " ")] = "engine-1 orbstack\n"
+        let report = await h.executor().execute(plan, confirmation: confirmation)
+        #expect(report.doneCount == 1)
+        #expect(h.commands.calls.last == ["/fake/bin/docker", "volume", "rm", "shop_db"])
+    }
+
+    @Test func oneEngineCheckServesTheWholePlan() async throws {
+        let h = try TestEnvironment()
+        let info = ["docker", "info", "--format", "{{.ID}} {{.Name}}"]
+        h.commands.outputs[info.dropFirst().joined(separator: " ")] = "engine-1 orbstack"
+        let items = ["a", "b", "c"].map { name -> ScanItem in
+            var item = h.item(name, paths: [], action: .command(argv: ["docker", "volume", "rm", name]))
+            item.preconditions = [CommandCheck(argv: info, expected: "engine-1 orbstack", purpose: .dockerEngine)]
+            return item
+        }
+        let plan = CleaningPlan.make(from: items)
+        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
+        #expect(report.doneCount == 3)
+        #expect(h.commands.calls.filter { $0.contains("info") }.count == 1)
+    }
+
+    @Test func commandsOnFoldersRespectTheDenylist() async throws {
+        let h = try TestEnvironment()
+        let uvCache = try h.make(".cache/uv")
+        let ok = h.item("uv", paths: [uvCache], action: .command(argv: ["uv", "cache", "clean", "--cache-dir", uvCache]))
+        let documents = try h.make("Documents")
+        let bad = h.item("bad", paths: [documents], action: .command(argv: ["uv", "cache", "clean", "--cache-dir", documents]))
+        let plan = CleaningPlan.make(from: [ok, bad])
+        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
+        #expect(h.commands.calls == [["/fake/bin/uv", "cache", "clean", "--cache-dir", uvCache]])
+        #expect(report.doneCount == 1)
     }
 
     @Test func permanentNeedsExplicitConfirmation() async throws {
@@ -173,7 +277,7 @@ struct TestEnvironment {
 
     @Test func commandsAreTreatedAsPermanent() async throws {
         let h = try TestEnvironment()
-        let plan = CleaningPlan.make(from: [h.item("uv", paths: [], action: .command(argv: ["uv", "cache", "clean"]))])
+        let plan = CleaningPlan.make(from: [h.item("uv", paths: [], action: .command(argv: ["uv", "cache", "clean", "--cache-dir", "/tmp/uv"]))])
         _ = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: false))
         #expect(h.commands.calls.isEmpty)
     }
@@ -183,8 +287,7 @@ struct TestEnvironment {
         let path = try h.make("Library/Caches/a")
         let plan = CleaningPlan.make(from: [h.item("a", paths: [path], action: .trash)], forcePermanent: ["a"])
         _ = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: false))
-        let line = try #require(h.log.lines.first)
-        let entry = try #require(try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: String])
+        let entry = try #require(h.log.operations.first)
         #expect(entry["status"] == "skipped: Permanent deletion was not confirmed")
         #expect(entry["action"] == "delete \(path)")
     }

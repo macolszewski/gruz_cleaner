@@ -173,7 +173,7 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
     public func verifyIndex(location: ClaudeMemoryLocation, destination: URL) async throws {
         let (tool, arguments) = try indexCommand()
         let result = try await ClaudeMemoryProcess.run(tool, arguments + ["--verify", "--database", location.database.path, "--output", destination.path], timeout: 180)
-        guard result.status == 0 else { throw LocalizedMessage("The preserved index does not match the database: \(result.output)") }
+        guard result.status == 0 else { throw LocalizedMessage("The index does not match the database: \(result.output)") }
     }
 
     public func start(_ worker: ClaudeMemoryWorker, location: ClaudeMemoryLocation) async throws {
@@ -196,30 +196,10 @@ enum ClaudeMemoryProcess {
     struct Output: Sendable { let status: Int32; let output: String }
     static func run(_ executable: String, _ arguments: [String], timeout: TimeInterval,
                     environment: [String: String] = [:]) async throws -> Output {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: executable)
-                process.arguments = arguments
-                process.environment = ExecutableLocator.environment.merging(environment) { _, new in new }
-                process.standardInput = FileHandle.nullDevice
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-                do { try process.run() } catch { continuation.resume(throwing: error); return }
-                let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
-                var tail = Data()
-                while true {
-                    let chunk = pipe.fileHandleForReading.availableData
-                    if chunk.isEmpty { break }
-                    tail.append(chunk)
-                    if tail.count > 16000 { tail = tail.suffix(16000) }
-                }
-                process.waitUntilExit()
-                deadline.cancel()
-                continuation.resume(returning: Output(status: process.terminationStatus, output: String(decoding: tail, as: UTF8.self)))
-            }
-        }
+        let out = try await ProcessRunner.run(
+            executable: executable, arguments: arguments, timeout: timeout,
+            outputLimit: 16_000, keepTail: true, environment: environment
+        )
+        return Output(status: out.status, output: String(decoding: out.stdout + out.stderr, as: UTF8.self))
     }
 }

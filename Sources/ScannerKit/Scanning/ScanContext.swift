@@ -23,35 +23,53 @@ public struct ScanOptions: Sendable {
 
 /// Tracks paths already described by some source, so each location is reported once.
 public actor ClaimRegistry {
+    public enum Outcome: Sendable, Equatable {
+        case claimed
+        /// The path or one of its ancestors is already claimed.
+        case covered
+        /// Paths inside it are claimed; it was not claimed.
+        case hasDescendants(Set<String>)
+    }
+
     private var claimed: Set<String> = []
+    /// Number of claimed paths below each ancestor, so "is anything inside?" is one lookup instead of a
+    /// scan of every claim, which kept large scans quadratic.
+    private var descendantCount: [String: Int] = [:]
 
     public init() {}
 
-    /// Returns false when the path, one of its ancestors or one of its descendants is already claimed.
-    public func claim(_ path: String) -> Bool {
-        if isClaimed(path) || claimed.contains(where: { $0.hasPrefix(path + "/") }) { return false }
-        claimed.insert(path)
-        return true
+    /// Claims `path` unless it is covered or has claimed descendants, in a single actor call.
+    public func tryClaim(_ path: String) -> Outcome {
+        let ancestors = Paths.ancestors(of: path)
+        if claimed.contains(path) || ancestors.contains(where: claimed.contains) { return .covered }
+        if descendantCount[path] != nil { return .hasDescendants(claimedInside(path)) }
+        insert(path, ancestors: ancestors)
+        return .claimed
     }
 
-    public func claimAll(_ paths: [String]) { claimed.formUnion(paths) }
+    /// Returns false when the path, one of its ancestors or one of its descendants is already claimed.
+    public func claim(_ path: String) -> Bool { tryClaim(path) == .claimed }
+
+    public func claimAll(_ paths: [String]) {
+        for path in paths { insert(path, ancestors: Paths.ancestors(of: path)) }
+    }
 
     public func isClaimed(_ path: String) -> Bool {
-        var p = path
-        while true {
-            if claimed.contains(p) { return true }
-            let parent = (p as NSString).deletingLastPathComponent
-            if parent == p || parent.isEmpty { return false }
-            p = parent
-        }
+        claimed.contains(path) || Paths.ancestors(of: path).contains(where: claimed.contains)
     }
 
-    /// Claimed paths strictly inside `path`.
+    /// Claimed paths strictly inside `path`. Rarely needed, so it is computed on demand.
     public func claimedInside(_ path: String) -> Set<String> {
-        claimed.filter { $0.hasPrefix(path + "/") }
+        guard descendantCount[path] != nil else { return [] }
+        return claimed.filter { Paths.isWithin($0, path) && $0 != path }
     }
 
     public func all() -> Set<String> { claimed }
+
+    private func insert(_ path: String, ancestors: [String]) {
+        guard claimed.insert(path).inserted else { return }
+        for ancestor in ancestors { descendantCount[ancestor, default: 0] += 1 }
+    }
 }
 
 struct ScanContext: Sendable {

@@ -140,6 +140,34 @@ public enum CleanAction: Codable, Sendable, Hashable {
     }
 }
 
+/// A read-only command whose output must still match what the scan saw before a removal may run.
+/// It ties a confirmed command to the exact object the user reviewed (a Docker engine, an image id).
+public struct CommandCheck: Codable, Sendable, Hashable {
+    public enum Purpose: String, Codable, Sendable {
+        /// The Docker CLI still talks to the engine that was scanned.
+        case dockerEngine
+        /// An image tag still points to the image that was scanned.
+        case dockerImage
+    }
+
+    public var argv: [String]
+    /// Expected output line, compared after trimming whitespace.
+    public var expected: String
+    public var purpose: Purpose
+
+    public init(argv: [String], expected: String, purpose: Purpose) {
+        self.argv = argv
+        self.expected = expected
+        self.purpose = purpose
+    }
+
+    /// Tools may add warnings around the answer (on stderr, merged by the runner), so one line must
+    /// match exactly.
+    public func isSatisfied(by output: String) -> Bool {
+        output.split(whereSeparator: \.isNewline).contains { $0.trimmingCharacters(in: .whitespaces) == expected }
+    }
+}
+
 /// A found location, or a group of them, with what it is and how it can be removed.
 public struct ScanItem: Identifiable, Sendable, Hashable, Codable {
     public var id: String
@@ -165,6 +193,11 @@ public struct ScanItem: Identifiable, Sendable, Hashable, Codable {
     public var rustArtifact: RustArtifact?
     /// Size change since an earlier scan, when history is available.
     public var growth: DiskGrowth?
+    /// Checks repeated right before the action runs; a mismatch blocks it until the next scan.
+    public var preconditions: [CommandCheck]?
+    /// True when part of this leaf could not be read, so the real size may be larger. Nil when complete
+    /// (optional only so older cached scans still decode); groups use `hasUnreadableContents`.
+    public var isPartiallyMeasured: Bool?
 
     public init(
         id: String,
@@ -212,6 +245,16 @@ public struct ScanItem: Identifiable, Sendable, Hashable, Codable {
     }
 
     public var leaves: [ScanItem] { isGroup ? children.flatMap(\.leaves) : [self] }
+
+    /// Records whether `info` covers the whole leaf. Every source that measures a leaf calls this.
+    func measured(_ info: SizeInfo) -> ScanItem {
+        var copy = self
+        copy.isPartiallyMeasured = info.isPartial ? true : nil
+        return copy
+    }
+
+    /// True when the item, or any leaf of a group, could be read only in part.
+    public var hasUnreadableContents: Bool { leaves.contains { $0.isPartiallyMeasured == true } }
 }
 
 public extension Int64 {

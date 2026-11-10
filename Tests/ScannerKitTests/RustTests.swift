@@ -64,7 +64,7 @@ import Testing
 
     @Test func dockerSharedCacheAndVolumesAreNotSafeReclaim() throws {
         let json = #"{"BuildCache":[{"InUse":"false","Shared":"true","Size":"36GB"},{"InUse":"false","Shared":"false","Size":"5GB"},{"InUse":"true","Shared":"false","Size":"2GB"},{"Size":"7GB"}],"Volumes":[{"Name":"abc","Labels":"com.docker.volume.anonymous=true","Links":"0","Size":"1GB"}]}"#
-        let items = DockerSource.parse(try JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8)))
+        let items = DockerSource.parse(try JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8)), engine: "engine-1")
         #expect(items.first { $0.id == "docker.buildcache" }?.sizeBytes == 5_000_000_000)
         #expect(items.first { $0.id == "docker.volumes.anonymous" }?.children.first?.safety == .caution)
     }

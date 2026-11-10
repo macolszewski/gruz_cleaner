@@ -22,5 +22,25 @@
 			<string>%lld niezacommitowanej zmiany</string>
 		</dict>
 	</dict>
+	<key>Spotlight did not answer, so %lld possible app leftovers were not checked.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Spotlight nie odpowiedział, więc nie sprawdzono %#@leftovers@.</string>
+		<key>leftovers</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld możliwej pozostałości po aplikacji</string>
+			<key>few</key>
+			<string>%lld możliwych pozostałości po aplikacjach</string>
+			<key>many</key>
+			<string>%lld możliwych pozostałości po aplikacjach</string>
+			<key>other</key>
+			<string>%lld możliwej pozostałości po aplikacjach</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

@@ -25,14 +25,50 @@ INDEX_QUERIES = {
 
 
 def string_list(value):
-    """Parse a JSON array column, falling back to comma-separated text written by older versions."""
+    """Parse a `facts` or `concepts` column like claude-mem's parseStringListField.
+
+    A JSON array keeps its non-blank strings. Anything else (a JSON string, other JSON, or plain
+    text, including text with commas) becomes one entry, so no fact is dropped or split.
+    """
     if not value:
         return []
+    text = str(value)
     try:
-        decoded = json.loads(value)
+        decoded = json.loads(text)
     except (ValueError, TypeError):
-        return [part.strip() for part in str(value).split(",") if part.strip()]
-    return [item for item in decoded if isinstance(item, str) and item] if isinstance(decoded, list) else []
+        return [text] if text.strip() else []
+    if isinstance(decoded, list):
+        return [item for item in decoded if isinstance(item, str) and item.strip()]
+    if isinstance(decoded, str):
+        return [decoded] if decoded.strip() else []
+    return [text] if text.strip() else []
+
+
+def _js_string(value):
+    """String conversion as JavaScript's String() and Array.join() perform it."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, list):
+        return ",".join(_js_string(item) for item in value)
+    return str(value)
+
+
+def file_list(value):
+    """Parse `files_read` / `files_modified` like claude-mem's parseFileList."""
+    if not value:
+        return []
+    text = str(value)
+    try:
+        decoded = json.loads(text)
+    except (ValueError, TypeError):
+        return [text]
+    if isinstance(decoded, list):
+        return decoded
+    return ["null" if decoded is None else _js_string(decoded)]
 
 
 def documents(kind, row):
@@ -53,10 +89,13 @@ def documents(kind, row):
         metadata.update(type=row.get("type") or "discovery", title=row.get("title") or "Untitled")
         if row.get("subtitle"):
             metadata["subtitle"] = row["subtitle"]
-        for field in ("concepts", "files_read", "files_modified"):
-            values = string_list(row.get(field))
+        concepts = string_list(row.get("concepts"))
+        if concepts:
+            metadata["concepts"] = ",".join(concepts)
+        for field in ("files_read", "files_modified"):
+            values = file_list(row.get(field))
             if values:
-                metadata[field] = ",".join(values)
+                metadata[field] = ",".join(_js_string(item) for item in values)
         result = []
         for field in ("narrative", "text"):
             if row.get(field):

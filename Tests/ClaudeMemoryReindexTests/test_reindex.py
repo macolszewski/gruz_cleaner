@@ -64,6 +64,31 @@ class ReindexTests(unittest.TestCase):
         self.assertEqual(docs[0][2]["merged_into_project"], "destination")
         self.assertEqual(docs[0][2]["platform_source"], "claude")
 
+    def test_list_fields_match_upstream_parsers(self):
+        # Expected values follow claude-mem's parseStringListField and parseFileList (commit 356b7c0),
+        # written out by hand rather than produced by the helper.
+        cases = [
+            ('["fact"]', ["fact"]),
+            ('"fact"', ["fact"]),
+            ("plain, with a comma", ["plain, with a comma"]),
+            ('["a", 2, "  ", "b"]', ["a", "b"]),
+            ('{"k": 1}', ['{"k": 1}']),
+            ('"   "', []),
+            ("", []),
+            (None, []),
+        ]
+        for raw, expected in cases:
+            self.assertEqual(reindex.string_list(raw), expected, raw)
+        self.assertEqual(reindex.file_list('["a.swift", "b.swift"]'), ["a.swift", "b.swift"])
+        self.assertEqual(reindex.file_list("a.swift, b.swift"), ["a.swift, b.swift"])
+        self.assertEqual(reindex.file_list('"a.swift"'), ["a.swift"])
+        self.assertEqual(reindex.file_list("null"), ["null"])
+
+    def test_fact_stored_as_json_string_is_indexed(self):
+        row = dict(id=5, created_at_epoch=1000, title="Untitled", facts='"The only fact"')
+        docs = reindex.documents("observations", row)
+        self.assertEqual([(doc[0], doc[1]) for doc in docs], [("obs_5_fact_0", "The only fact")])
+
     def test_title_only_and_empty_observations(self):
         self.assertEqual(reindex.documents("observations", dict(id=1, created_at_epoch=1000, title="Title"))[0][0], "obs_1_title")
         self.assertEqual(reindex.documents("observations", dict(id=1, created_at_epoch=1000, title="Untitled")), [])

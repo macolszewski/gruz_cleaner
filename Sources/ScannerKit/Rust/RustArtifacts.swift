@@ -110,7 +110,7 @@ public enum RustArtifacts {
                     guard info.allocatedBytes > 0 else { continue }
                     parts.append(ScanItem(id: "rust:retained:\(full)", category: .rust, title: String(localized: "Kept: \(name)", bundle: .scannerKit),
                         description: String(localized: "Build output or other profile contents. Not included in Rust cache cleanup.", bundle: .scannerKit),
-                        safety: .userData, sizeBytes: info.allocatedBytes, paths: [full]))
+                        safety: .userData, sizeBytes: info.allocatedBytes, paths: [full]).measured(info))
                 }
                 guard !parts.isEmpty else { return }
                 children.append(ScanItem(id: "rust:profile:\(path)", category: .rust,
@@ -131,7 +131,7 @@ public enum RustArtifacts {
             let info = SizeCalculator.measure(target)
             children = [ScanItem(id: "rust:unknown:\(target)", category: .rust, title: String(localized: "Unrecognized target layout", bundle: .scannerKit),
                 description: String(localized: "No recognized profile with a Cargo lock and a .fingerprint folder. Cleaning is disabled.", bundle: .scannerKit),
-                safety: .caution, sizeBytes: info.allocatedBytes, paths: [target])]
+                safety: .caution, sizeBytes: info.allocatedBytes, paths: [target]).measured(info)]
         }
         return ScanItem(id: "rust:target:\(target)", category: .rust,
             title: ((target as NSString).deletingLastPathComponent as NSString).lastPathComponent,

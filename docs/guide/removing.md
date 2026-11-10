@@ -78,8 +78,15 @@ always need the extra confirmation. GRUZ runs only commands from a fixed allow-l
 ## After removal
 
 While the plan runs, the sheet shows progress. Docker and cache commands can take a few minutes.
-When it finishes, the result lists each operation as done, skipped (with the reason) or failed (with
-the error and the command output, if any).
+When it finishes, the result lists each operation as done, partly done (some of its paths could not be
+removed; they are listed and stay in the item list), skipped (with the reason) or failed (with the
+error and the command output, if any).
+
+A Docker command is skipped when the `docker` CLI now talks to a different engine than the one that
+was scanned (for example after `docker context use`), and an image is skipped when its tag now points
+to a different image. Scan again to see the current state.
+
+GRUZ will not quit, and will not start a scan, while a removal is running.
 
 At the top, GRUZ reports the measured change in free space on the disk. This is more honest than the
 sum of estimated sizes, which can overlap (see [Limitations](../reference/limitations.md#sizes-are-estimates)).
@@ -95,7 +102,8 @@ grow after the sheet closes.
 
 ## Operation log
 
-Every confirmed operation, including skipped and failed ones, is appended as one JSON line to
-`~/Library/Logs/GRUZ/operations.log`: the time, the item, its size, the action with exact paths or
-command, and the status. The result sheet shows the log path, and
+Every confirmed operation, including skipped, failed and partly done ones, is appended as one JSON
+line to `~/Library/Logs/GRUZ/operations.log`: the time, the item, its size, the action with exact paths
+or command, the status with the paths that failed, and the command output. If the log cannot be
+written, nothing is removed. The result sheet shows the log path, and
 **Show Operation Log in Finder** in [Settings > Access](settings.md#access) opens it.

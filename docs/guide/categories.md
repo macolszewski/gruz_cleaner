@@ -54,7 +54,9 @@ Gradle, Maven, NuGet, Dart pub, the Cargo registry, Playwright and Puppeteer bro
 versions kept by nvm and FVM.
 
 Most are **Safe** or **Regenerable** and move to the Trash. The uv cache is cleared with
-`uv cache clean` instead, because uv keeps its cache consistent that way; the command is permanent. Tools and
+`uv cache clean --cache-dir <the measured folder>` instead, because uv keeps its cache consistent that
+way; the command is permanent. The local Maven repository is **Caution**: next to downloaded libraries
+it holds artifacts installed with `mvn install`, which may exist nowhere else. Tools and
 Python versions installed by uv are **Caution**. The currently installed Node.js (nvm) and a locally
 installed .NET SDK are shown as **User data**.
 
@@ -113,7 +115,8 @@ and the Android tools cache.
 ### AI tools
 
 - Model caches: Hugging Face, PyTorch, LM Studio and Ollama models (**Regenerable**, a large
-  download to get back).
+  download to get back). For Hugging Face only the model stores are offered; the login token next to
+  them is kept.
 - Claude Code: old versions, temporary files, session transcripts and file history. Sessions and file
   history are **Caution** and are shown only when older than 30 days by default.
 - Codex: sessions (older than 30 days by default), temporary files, logs, runtimes and the app cache.
@@ -126,7 +129,9 @@ database has its own section, [claude-mem maintenance](claude-mem.md).
 ### App caches
 
 Caches of Spotify, JetBrains IDEs, Visual Studio Code, Electron apps, downloaded app updates, and
-other folders in `~/Library/Caches`. Settings of older JetBrains IDE versions are **Caution**. Data of
+other folders in `~/Library/Caches`. For JetBrains IDEs only indexes and caches are offered: Local
+History, which the IDEs keep in the same folder and which can restore deleted files and uncommitted
+changes, is never removed. Settings of older JetBrains IDE versions are **Caution**. Data of
 apps such as WhatsApp, Warp or Postman is shown as **User data**.
 
 ### Browsers

@@ -176,7 +176,12 @@ public actor ClaudeMemoryCleaner {
                     }
                 }
                 let staging = reusable ?? location.root.appendingPathComponent(".cleaner-chroma-\(UUID().uuidString)")
-                if reusable == nil { try await runtime.rebuildIndex(location: location, destination: staging, progress: progress) }
+                if reusable == nil {
+                    try await runtime.rebuildIndex(location: location, destination: staging, progress: progress)
+                    // The rebuild read one snapshot; check the result against the database as it is now, so a
+                    // write that landed during the rebuild cannot leave the installed index behind.
+                    try await runtime.verifyIndex(location: location, destination: staging)
+                }
                 try await runtime.checkStopped(location: location)
                 try installIndex(staging, location: location, backup: backup)
             }
@@ -202,11 +207,11 @@ public actor ClaudeMemoryCleaner {
             }
         }
         report.failure = failure?.text
-        let entry: [String: Any] = ["time": ISO8601DateFormatter().string(from: Date()), "action": "claude-mem-clean",
+        let entry: [String: Any] = ["action": "claude-mem-clean",
                                    "records": report.removedRecords, "files": report.trashedFiles, "reindexed": report.indexRebuilt,
                                    "backup": report.backup?.path ?? "", "status": failure?.english ?? "done"]
-        if let data = try? JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys]) {
-            log.record(String(decoding: data, as: UTF8.self))
+        if let note = log.recordAfterRun(entry) {
+            report.failure = [report.failure, note].compactMap { $0 }.joined(separator: "\n")
         }
         return report
     }

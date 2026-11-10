@@ -10,18 +10,19 @@ enum RuleSource {
             var accepted: [String] = []
             for path in matches(for: rule, home: ctx.options.home) {
                 if rule.action != nil, ctx.denylist.check(path) != .allowed { continue }
-                if await ctx.claims.isClaimed(path) { continue }
-                let inside = await ctx.claims.claimedInside(path)
-                // A removable catch-all must not overlap a more specific item; informational ones show the remainder.
-                if !inside.isEmpty {
+                switch await ctx.claims.tryClaim(path) {
+                case .claimed:
+                    accepted.append(path)
+                case .covered:
+                    continue
+                case .hasDescendants(let inside):
+                    // A removable catch-all must not overlap a more specific item; informational ones show the remainder.
                     if rule.action != nil { continue }
                     exclusions[path] = inside
-                    // `claim` refuses paths with claimed descendants, so take the remainder explicitly.
+                    // `tryClaim` refuses paths with claimed descendants, so take the remainder explicitly.
                     await ctx.claims.claimAll([path])
                     accepted.append(path)
-                    continue
                 }
-                if await ctx.claims.claim(path) { accepted.append(path) }
             }
             if !accepted.isEmpty { resolved.append((rule, accepted)) }
         }
@@ -80,9 +81,9 @@ enum RuleSource {
                 id: id, ruleID: rule.id, category: rule.category, title: title, app: rule.app,
                 description: rule.description, regeneration: rule.regeneration, safety: rule.safety,
                 sizeBytes: info.allocatedBytes, lastModified: info.newestModification, paths: paths,
-                action: rule.action, ownerBundleIDs: rule.ownerBundleIDs, requiresAppClosed: rule.requiresAppClosed,
+                action: resolvedAction(rule.action, path: paths.first), ownerBundleIDs: rule.ownerBundleIDs, requiresAppClosed: rule.requiresAppClosed,
                 defaultAgeDays: rule.defaultAgeDays, note: rule.note
-            )
+            ).measured(info)
         }
 
         let grouped = rule.group || paths.count > 1 || rule.kind == .versions
@@ -105,6 +106,16 @@ enum RuleSource {
         group.sizeBytes = children.reduce(0) { $0 + $1.sizeBytes }
         group.lastModified = children.compactMap(\.lastModified).max()
         return group
+    }
+
+    /// Placeholder in a command rule's `argv` replaced by the matched path, so the command acts on
+    /// exactly the folder that was measured and reviewed.
+    static let pathPlaceholder = "{path}"
+
+    static func resolvedAction(_ action: CleanAction?, path: String?) -> CleanAction? {
+        guard case .command(let argv) = action, argv.contains(pathPlaceholder) else { return action }
+        guard let path else { return nil }
+        return .command(argv: argv.map { $0 == pathPlaceholder ? path : $0 })
     }
 
     static func childTitle(_ path: String, style: Rule.ChildTitle, home: String) -> String {

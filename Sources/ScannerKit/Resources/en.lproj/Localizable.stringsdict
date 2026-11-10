@@ -18,5 +18,21 @@
 			<string>%lld uncommitted changes</string>
 		</dict>
 	</dict>
+	<key>Spotlight did not answer, so %lld possible app leftovers were not checked.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Spotlight did not answer, so %#@leftovers@ were not checked.</string>
+		<key>leftovers</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld possible app leftover</string>
+			<key>other</key>
+			<string>%lld possible app leftovers</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

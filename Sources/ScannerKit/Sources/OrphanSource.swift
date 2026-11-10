@@ -19,21 +19,26 @@ enum OrphanSource {
             }
         }
 
-        // Spotlight catches apps outside the usual folders.
-        var orphans: [String: [String]] = [:]
-        for (id, paths) in candidates where !(await spotlightFinds(id)) { orphans[id] = paths }
-
-        let sizes = await SizeCalculator.measureAll(orphans.values.flatMap { $0 })
+        // Measure first: the size filter is cheap compared with a Spotlight query per candidate.
+        let sizes = await SizeCalculator.measureAll(candidates.values.flatMap { $0 })
+        func size(of paths: [String]) -> SizeInfo { paths.reduce(into: SizeInfo()) { $0.merge(sizes[$1] ?? SizeInfo()) } }
         let minimum = Int64(config.minimumSizeMB) * 1_000_000
+        let large = candidates.filter { size(of: $0.value).allocatedBytes >= minimum }
+
+        // Spotlight catches apps outside the usual folders. When it cannot answer, the data is not
+        // reported as a leftover: an unknown answer is no evidence that the app is gone.
+        let lookups = await concurrentMap(Array(large.keys), width: 4) { await spotlightLookup($0) }
+        let undetermined = lookups.values.filter { $0 == .unknown }.count
+        if undetermined > 0 {
+            await ctx.warnings.add(String(localized: "Spotlight did not answer, so \(undetermined) possible app leftovers were not checked.", bundle: .scannerKit))
+        }
+
         var items: [ScanItem] = []
-        for (id, paths) in orphans {
-            var info = SizeInfo()
-            for p in paths { info.merge(sizes[p] ?? SizeInfo()) }
-            guard info.allocatedBytes >= minimum else { continue }
+        for (id, paths) in large where lookups[id] == .notFound {
             let allowed = paths.filter { ctx.denylist.check($0) == .allowed }
             guard !allowed.isEmpty else { continue }
             await ctx.claims.claimAll(allowed)
-            items.append(makeItem(id: id, paths: allowed, info: info))
+            items.append(makeItem(id: id, paths: allowed, info: size(of: allowed)))
         }
         return items.sorted { $0.sizeBytes > $1.sizeBytes }
     }
@@ -46,7 +51,7 @@ enum OrphanSource {
             regeneration: String(localized: "If you install the app again, it will start with default settings.", bundle: .scannerKit),
             safety: .caution, sizeBytes: info.allocatedBytes, lastModified: info.newestModification,
             paths: paths.sorted(), action: .trash
-        )
+        ).measured(info)
     }
 
     /// "ABCDE12345.com.x.y" / "group.com.x.y" / "com.x.y.savedState" -> "com.x.y"; nil for non-identifiers.
@@ -107,12 +112,18 @@ enum OrphanSource {
         }
     }
 
-    static func spotlightFinds(_ id: String) async -> Bool {
+    enum Lookup: Equatable {
+        case found
+        case notFound
+        case unknown
+    }
+
+    static func spotlightLookup(_ id: String) async -> Lookup {
         // mdfind is read-only; called directly because it only queries the Spotlight index.
         guard let out = try? await Subprocess.run(
             executable: "/usr/bin/mdfind", arguments: ["kMDItemCFBundleIdentifier == '\(id.replacingOccurrences(of: "'", with: ""))'"],
             timeout: 10
-        ) else { return false }
-        return !out.stdout.isEmpty
+        ), out.status == 0 else { return .unknown }
+        return out.stdout.isEmpty ? .notFound : .found
     }
 }

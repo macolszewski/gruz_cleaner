@@ -177,3 +177,9 @@
 "GRUZ it!" = "GRUZUJ to!";
 "Review the selected items. Nothing is removed until you confirm." = "Przejrzyj zaznaczone pozycje. Nic nie zostanie usunięte bez Twojego potwierdzenia.";
 "Opens the review of the selected items. Nothing is removed until you confirm." = "Otwiera przegląd zaznaczonych pozycji. Nic nie zostanie usunięte bez Twojego potwierdzenia.";
+"GRUZ is still removing data" = "GRUZ wciąż usuwa dane";
+"Nothing in this folder can be removed: %@" = "Z tego katalogu nic nie zostanie usunięte: %@";
+"Partly removed. Not removed: %@" = "Usunięto częściowo. Nie usunięto: %@";
+"Quit after it finishes, so every result is shown and logged." = "Zamknij aplikację po zakończeniu, żeby każdy wynik został pokazany i zapisany w dzienniku.";
+"Some contents could not be read, so the real size may be larger." = "Części zawartości nie udało się odczytać, więc rzeczywisty rozmiar może być większy.";
+"Wait until the scan finishes, then review the selection again." = "Poczekaj na koniec skanu i ponownie przejrzyj zaznaczenie.";

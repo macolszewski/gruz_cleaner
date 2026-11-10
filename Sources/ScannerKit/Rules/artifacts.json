@@ -89,9 +89,44 @@
       "pyproject.toml"
     ],
     "title": "Build folders",
-    "description": "Build output (Flutter, Gradle, CMake, Python).",
+    "description": "Build output (Flutter, Gradle, CMake, Python). A folder counts only when it holds files a build tool generates and no source code.",
     "regeneration": "Build the project again.",
-    "safety": "regenerable"
+    "safety": "regenerable",
+    "insideAny": [
+      ".last_build_id",
+      "flutter_assets",
+      "intermediates",
+      "generated",
+      "tmp",
+      "classes",
+      "kotlin",
+      "outputs",
+      "libs",
+      "CMakeCache.txt",
+      "CMakeFiles",
+      "cmake_install.cmake",
+      "lib",
+      "lib.*",
+      "bdist.*",
+      "temp.*",
+      "scripts-*"
+    ],
+    "insideNone": [
+      "__init__.py",
+      "*.py",
+      "*.swift",
+      "*.kt",
+      "*.java",
+      "*.dart",
+      "*.c",
+      "*.cc",
+      "*.cpp",
+      "*.h",
+      "*.rs",
+      "*.go",
+      "*.ts",
+      "*.js"
+    ]
   },
   {
     "id": "artifact.dart_tool",

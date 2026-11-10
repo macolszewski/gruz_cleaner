@@ -207,13 +207,14 @@
     "category": "ai",
     "app": "Hugging Face",
     "title": "Hugging Face models",
-    "description": "Models downloaded from Hugging Face (e.g. Whisper for superwhisper and MLX, pyannote and speechbrain models for speaker recognition). Model files are shared in a single store, so the folder is removed as a whole.",
+    "description": "Models and datasets downloaded from Hugging Face (e.g. Whisper for superwhisper and MLX, pyannote and speechbrain models for speaker recognition). Files are shared within each store, so a store is removed as a whole. Your login token is stored next to it and is kept.",
     "regeneration": "The app downloads the model again the next time it is used (often several GB).",
     "safety": "regenerable",
     "paths": [
-      "~/.cache/huggingface"
+      "~/.cache/huggingface/hub",
+      "~/.cache/huggingface/xet"
     ],
-    "group": false,
+    "group": true,
     "action": {
       "type": "trash"
     }

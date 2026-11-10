@@ -71,7 +71,7 @@ enum ProjectSource {
             title: title, app: nil, description: definition.description, regeneration: definition.regeneration,
             safety: definition.safety, sizeBytes: info.allocatedBytes, lastModified: info.newestModification,
             paths: [path], action: definition.action, note: note
-        )
+        ).measured(info)
     }
 
     static func makeGroup(_ definition: ArtifactDefinition, children: [ScanItem]) -> ScanItem? {
@@ -130,15 +130,16 @@ enum ProjectSource {
             let siblings = (try? FileManager.default.contentsOfDirectory(atPath: parent)) ?? []
             guard siblings.contains(where: { s in d.siblingsAny.contains { Paths.fnmatch($0, s) } }) else { return false }
         }
-        if !d.insideAny.isEmpty {
+        if !d.insideAny.isEmpty || !d.insideNone.isEmpty {
             let inside = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
-            guard inside.contains(where: { s in d.insideAny.contains { Paths.fnmatch($0, s) } }) else { return false }
+            if !d.insideAny.isEmpty, !inside.contains(where: { s in d.insideAny.contains { Paths.fnmatch($0, s) } }) { return false }
+            if inside.contains(where: { s in d.insideNone.contains { Paths.fnmatch($0, s) } }) { return false }
         }
         return true
     }
 
     static func gitStatusNote(_ path: String) async -> String? {
-        guard let out = try? await ReadOnlyCommand.run(["git", "-C", path, "status", "--porcelain"], timeout: 20),
+        guard let out = try? await ReadOnlyCommand.run(["git"] + GitInspection.options + ["-C", path, "status", "--porcelain"], timeout: 20),
               out.status == 0 else { return String(localized: "Could not check the Git status", bundle: .scannerKit) }
         let lines = String(decoding: out.stdout, as: UTF8.self).split(separator: "\n").count
         return lines == 0 ? String(localized: "Git: no uncommitted changes", bundle: .scannerKit) : String(localized: "Git: \(lines) uncommitted changes. Check before removing!", bundle: .scannerKit)

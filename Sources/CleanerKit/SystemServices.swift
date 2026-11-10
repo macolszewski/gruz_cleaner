@@ -19,29 +19,24 @@ public struct SystemCommandRunner: CommandRunning {
 
     public func locate(_ tool: String) -> String? { ExecutableLocator.locate(tool) }
 
+    /// Cleanup commands can legitimately run for minutes (brew cleanup, large Docker images), so the
+    /// deadline is generous; it exists so a hung tool cannot keep the app busy forever.
+    public static let timeout: TimeInterval = 30 * 60
+
     public func run(executable: String, arguments: [String]) async throws -> (status: Int32, output: String) {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: executable)
-                process.arguments = arguments
-                process.environment = ExecutableLocator.environment
-                process.standardInput = FileHandle.nullDevice
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-                continuation.resume(returning: (process.terminationStatus, String(text.suffix(4000))))
-            }
-        }
+        let out = try await ProcessRunner.run(
+            executable: executable, arguments: arguments, timeout: Self.timeout, outputLimit: 4_000, keepTail: true
+        )
+        if out.wasStopped { throw CommandStopped() }
+        let text = String(decoding: out.stdout + out.stderr, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return (out.status, String(text.suffix(4000)))
+    }
+}
+
+/// The command was stopped before it finished (deadline or cancellation); its effect is unknown.
+public struct CommandStopped: LocalizedError {
+    public var errorDescription: String? {
+        String(localized: "The command was stopped before it finished; part of the data may already be removed.", bundle: .cleanerKit)
     }
 }
 
@@ -67,14 +62,14 @@ public struct FileOperationLog: OperationLogging {
 
     public init(url: URL = FileOperationLog.defaultURL) { self.url = url }
 
-    public func record(_ line: String) {
+    public func record(_ line: String) throws {
         let fm = FileManager.default
-        try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if !fm.fileExists(atPath: url.path) { fm.createFile(atPath: url.path, contents: nil) }
-        guard let handle = try? FileHandle(forWritingTo: url) else { return }
+        let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: Data((line + "\n").utf8))
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((line + "\n").utf8))
     }
 }
 

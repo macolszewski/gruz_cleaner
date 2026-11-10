@@ -24,7 +24,7 @@ enum ApplicationsSource {
             description: String(localized: "An app installed in \(Paths.abbreviate((path as NSString).deletingLastPathComponent)). GRUZ does not remove apps; uninstall it in the Finder, with Homebrew or with JetBrains Toolbox.", bundle: .scannerKit),
             safety: .userData, sizeBytes: info.allocatedBytes, lastModified: info.newestModification, paths: [path],
             ownerBundleIDs: bundleID.map { [$0] } ?? []
-        )
+        ).measured(info)
     }
 }
 
@@ -74,6 +74,6 @@ enum UnrecognizedSource {
             description: String(localized: "No rule in the catalog describes this folder, so GRUZ cannot tell whether it is safe to remove. It is shown for information only.", bundle: .scannerKit),
             safety: .caution, sizeBytes: info.allocatedBytes, lastModified: info.newestModification,
             paths: [path], note: excludesClaimedPaths ? String(localized: "Excludes subfolders described in other categories", bundle: .scannerKit) : nil
-        )
+        ).measured(info)
     }
 }

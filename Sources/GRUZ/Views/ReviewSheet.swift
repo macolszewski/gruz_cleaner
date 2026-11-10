@@ -282,6 +282,7 @@ struct ResultView: View {
     private func statusIcon(_ status: OperationResult.Status) -> some View {
         switch status {
         case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .partial: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
         case .skipped: Image(systemName: "minus.circle.fill").foregroundStyle(.orange)
         case .failed: Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
         }
@@ -290,6 +291,7 @@ struct ResultView: View {
     private func statusText(_ status: OperationResult.Status) -> String? {
         switch status {
         case .done: nil
+        case .partial(let why): String(localized: "Partly removed. Not removed: \(why)")
         case .skipped(let why): String(localized: "Skipped: \(why)")
         case .failed(let why): String(localized: "Error: \(why)")
         }

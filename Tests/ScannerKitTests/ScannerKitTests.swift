@@ -34,7 +34,17 @@ struct Fixture {
         #expect(CommandPolicy.isAllowedCleanCommand(["docker", "image", "rm", "nginx:alpine"]))
         #expect(CommandPolicy.isAllowedCleanCommand(["docker", "builder", "prune", "--force"]))
         #expect(CommandPolicy.isAllowedCleanCommand(["xcrun", "simctl", "delete", "2CC2A9FF-BC88-4309-87CE-AE583195DD9B"]))
-        #expect(CommandPolicy.isAllowedCleanCommand(["uv", "cache", "clean"]))
+        #expect(CommandPolicy.isAllowedCleanCommand(["uv", "cache", "clean", "--cache-dir", "/Users/me/.cache/uv"]))
+        // Without the folder, uv would clean whatever cache its configuration points to.
+        #expect(!CommandPolicy.isAllowedCleanCommand(["uv", "cache", "clean"]))
+    }
+
+    @Test func gitInspectionDisablesConfiguredPrograms() {
+        let argv = ["git"] + GitInspection.options + ["-C", "/Users/me/code/app", "status", "--porcelain"]
+        #expect(CommandPolicy.isAllowedReadOnlyCommand(argv))
+        #expect(GitInspection.options.contains("core.fsmonitor=false"))
+        #expect(GitInspection.options.contains("--no-optional-locks"))
+        #expect(!CommandPolicy.isAllowedReadOnlyCommand(["git", "-C", "/Users/me/code/app", "status", "--porcelain"]))
     }
 
     @Test func rejectsEverythingElse() {
@@ -99,6 +109,34 @@ struct Fixture {
         let d = Denylist(home: fx.path("home"))
         #expect(d.check(fx.path("home/Library/Caches/link/secret")) != .allowed)
     }
+
+    @Test func symlinkedCacheFolderLeadingToSourceIsRefused() throws {
+        // ~/.npm/_npx -> ~/workspace/app/src: the target is an allowed place, yet it is not a cache.
+        let fx = try Fixture()
+        try fx.file("home/workspace/app/src/main.swift")
+        try fx.dir("home/.npm")
+        try FileManager.default.createSymbolicLink(atPath: fx.path("home/.npm/_npx"), withDestinationPath: fx.path("home/workspace/app/src"))
+        let d = Denylist(home: fx.path("home"))
+        #expect(d.check(fx.path("home/.npm/_npx/main.swift")) != .allowed)
+        // Removing the link itself only removes the link.
+        #expect(d.check(fx.path("home/.npm/_npx")) == .allowed)
+    }
+
+    @Test func dataThatCannotBeRecreatedIsKeptInsideCaches() throws {
+        let fx = try Fixture()
+        try fx.file("home/Library/Caches/JetBrains/Rider2025.2/LocalHistory/changes.storageData")
+        try fx.dir("home/Library/Caches/JetBrains/Rider2025.2/caches")
+        try fx.file("home/.cache/huggingface/token", contents: "hf_x")
+        try fx.dir("home/.cache/huggingface/hub")
+        let d = Denylist(home: fx.path("home"))
+        #expect(d.check(fx.path("home/Library/Caches/JetBrains/Rider2025.2/caches")) == .allowed)
+        #expect(d.check(fx.path("home/Library/Caches/JetBrains/Rider2025.2/LocalHistory")) != .allowed)
+        // A broad rule over ~/Library/Caches/* must not take Local History along with its parent.
+        #expect(d.check(fx.path("home/Library/Caches/JetBrains/Rider2025.2")) != .allowed)
+        #expect(d.check(fx.path("home/Library/Caches/JetBrains")) != .allowed)
+        #expect(d.check(fx.path("home/.cache/huggingface/hub")) == .allowed)
+        #expect(d.check(fx.path("home/.cache/huggingface")) != .allowed)
+    }
 }
 
 @Suite struct PathTests {
@@ -118,6 +156,15 @@ struct Fixture {
         #expect(Paths.glob(fx.path("Missing/*")).isEmpty)
     }
 
+    @Test func globDoesNotFollowSymlinkedFolders() throws {
+        let fx = try Fixture()
+        try fx.file("home/workspace/app/src/main.swift")
+        try fx.dir("home/.npm/_cacache/index")
+        try FileManager.default.createSymbolicLink(atPath: fx.path("home/.npm/_npx"), withDestinationPath: fx.path("home/workspace/app/src"))
+        #expect(Paths.glob("~/.npm/_npx/*", home: fx.path("home")).isEmpty)
+        #expect(Paths.glob("~/.npm/*", home: fx.path("home")) == [fx.path("home/.npm/_cacache"), fx.path("home/.npm/_npx")])
+    }
+
     @Test func versionCompare() {
         #expect(VersionCompare.isNewer("v26.3.0", than: "v9.10.0"))
         #expect(VersionCompare.isNewer("1.10", than: "1.9"))
@@ -135,6 +182,18 @@ struct Fixture {
         #expect(info.allocatedBytes >= 100_000)
         #expect(info.allocatedBytes < 200_000)
         #expect(info.newestModification != nil)
+    }
+
+    @Test func reportsUnreadableContents() throws {
+        let fx = try Fixture()
+        try fx.file("tree/readable.bin", bytes: 10_000)
+        try fx.file("tree/locked/hidden.bin", bytes: 10_000)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: fx.path("tree/locked"))
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fx.path("tree/locked")) }
+        let info = SizeCalculator.measure(fx.path("tree"))
+        #expect(info.isPartial)
+        #expect(SizeCalculator.measure(fx.path("tree/readable.bin")).isPartial == false)
+        #expect(SizeCalculator.measure(fx.path("missing")).isPartial == false)
     }
 
     @Test func excludesSubtrees() throws {
@@ -255,7 +314,7 @@ struct Fixture {
 
     @Test func parsesUnusedResourcesOnly() throws {
         let df = try JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8))
-        let items = DockerSource.parse(df)
+        let items = DockerSource.parse(df, engine: "engine-1")
         let images = try #require(items.first { $0.id == "docker.images.unused" })
         #expect(images.children.count == 2)
         #expect(images.children.contains { $0.action == .command(argv: ["docker", "image", "rm", "shop-worker:audit"]) })
@@ -275,6 +334,29 @@ struct Fixture {
         let cache = try #require(items.first { $0.id == "docker.buildcache" })
         #expect(cache.sizeBytes == 8_600_000_000)
         #expect(!items.contains { $0.paths.contains { $0.contains("orbstack") } && $0.action != nil })
+    }
+
+    @Test func removalsAreBoundToTheScannedEngineAndImage() throws {
+        let df = try JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8))
+        let leaves = DockerSource.parse(df, engine: "engine-1").flatMap(\.leaves).filter { $0.action != nil }
+        #expect(!leaves.isEmpty)
+        let engineCheck = CommandCheck(argv: DockerSource.engineIdentityCommand, expected: "engine-1", purpose: .dockerEngine)
+        #expect(leaves.allSatisfy { $0.preconditions?.contains(engineCheck) == true })
+        for check in leaves.flatMap({ $0.preconditions ?? [] }) {
+            #expect(CommandPolicy.isAllowedCheckCommand(check.argv))
+        }
+        // A tag can move to another image after a pull or build; the scanned image id is checked first.
+        let tagged = try #require(leaves.first { $0.title == "shop-worker:audit" })
+        #expect(tagged.preconditions?.contains(CommandCheck(
+            argv: ["docker", "image", "inspect", "--format", "{{.Id}}", "shop-worker:audit"], expected: "sha256:aaa", purpose: .dockerImage
+        )) == true)
+    }
+
+    @Test func withoutAnEngineIdentityNothingIsRemovable() throws {
+        let df = try JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8))
+        let items = DockerSource.parse(df, engine: nil)
+        #expect(!items.isEmpty)
+        #expect(items.flatMap(\.leaves).allSatisfy { $0.action == nil })
     }
 
     @Test func parsesDockerSizes() {
@@ -310,6 +392,66 @@ struct Fixture {
         #expect(!paths.contains(fx.path("ws/py/.env")))
         #expect(!paths.contains { $0.contains("/.git/") })
         #expect(paths.contains(fx.path("ws/repo/.claude/worktrees")))
+    }
+
+    @Test func buildFolderNeedsGeneratedContent() throws {
+        let fx = try Fixture()
+        // A Python package that happens to be called build.
+        try fx.file("ws/tool/pyproject.toml")
+        try fx.file("ws/tool/build/__init__.py")
+        try fx.file("ws/tool/build/lib/helpers.py")
+        // setuptools output.
+        try fx.file("ws/lib/setup.py")
+        try fx.file("ws/lib/build/lib/pkg/__init__.py")
+        try fx.dir("ws/lib/build/bdist.macosx-15.0-arm64")
+        // Gradle output.
+        try fx.file("ws/android/build.gradle.kts")
+        try fx.dir("ws/android/build/intermediates")
+        // A build folder with nothing that marks it as generated.
+        try fx.file("ws/cpp/CMakeLists.txt")
+        try fx.file("ws/cpp/build/notes.txt")
+
+        let catalog = try RuleCatalog.builtIn()
+        let paths = Set(ProjectSource.findArtifacts(in: fx.path("ws"), definitions: catalog.artifacts, home: "/nonexistent").map(\.path))
+        #expect(!paths.contains(fx.path("ws/tool/build")))
+        #expect(paths.contains(fx.path("ws/lib/build")))
+        #expect(paths.contains(fx.path("ws/android/build")))
+        #expect(!paths.contains(fx.path("ws/cpp/build")))
+    }
+}
+
+@Suite struct ClaimRegistryTests {
+    @Test func tracksAncestorsAndDescendants() async {
+        let r = ClaimRegistry()
+        #expect(await r.claim("/h/a/b"))
+        #expect(await r.claim("/h/a/c"))
+        #expect(!(await r.claim("/h/a")))
+        #expect(!(await r.claim("/h/a/b/x")))
+        #expect(await r.isClaimed("/h/a/b/x"))
+        #expect(!(await r.isClaimed("/h/a")))
+        #expect(await r.claimedInside("/h/a") == ["/h/a/b", "/h/a/c"])
+        #expect(await r.claimedInside("/h") == ["/h/a/b", "/h/a/c"])
+        #expect(await r.claimedInside("/h/a/b").isEmpty)
+        // A prefix of a name is not an ancestor.
+        #expect(await r.claim("/h/a/bb"))
+    }
+}
+
+@Suite struct RuleCommandTests {
+    @Test func uvCleansTheMeasuredFolder() throws {
+        let catalog = try RuleCatalog.builtIn()
+        let rule = try #require(catalog.rules.first { $0.id == "uv.cache" })
+        let item = try #require(RuleSource.makeItem(
+            rule: rule, paths: ["/Users/me/.cache/uv"], sizes: ["/Users/me/.cache/uv": SizeInfo(allocatedBytes: 1)], home: "/Users/me"
+        ))
+        #expect(item.action == .command(argv: ["uv", "cache", "clean", "--cache-dir", "/Users/me/.cache/uv"]))
+        #expect(item.paths == ["/Users/me/.cache/uv"])
+    }
+
+    @Test func jetBrainsRuleNeverCoversLocalHistory() throws {
+        let catalog = try RuleCatalog.builtIn()
+        let rule = try #require(catalog.rules.first { $0.id == "jetbrains.caches" })
+        #expect(rule.paths.allSatisfy { !$0.hasSuffix("/*") && !$0.contains("LocalHistory") })
     }
 }
 
@@ -360,5 +502,40 @@ struct Fixture {
         json["language"] = nil
         let legacy = try JSONDecoder().decode(ScanResult.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(legacy.language == nil)
+    }
+}
+
+@Suite struct ProcessRunnerTests {
+    @Test func stopsAProgramAtTheDeadline() async throws {
+        let started = Date()
+        let out = try await ProcessRunner.run(executable: "/bin/sleep", arguments: ["30"], timeout: 0.5)
+        #expect(out.wasStopped)
+        #expect(Date().timeIntervalSince(started) < 10)
+    }
+
+    @Test func aChildHoldingThePipeDoesNotBlock() async throws {
+        // The shell exits at once, but the background sleep keeps stdout open.
+        let started = Date()
+        let out = try await ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "echo ready; /bin/sleep 30 &"], timeout: 20)
+        #expect(!out.wasStopped)
+        #expect(String(decoding: out.stdout, as: UTF8.self).hasPrefix("ready"))
+        #expect(Date().timeIntervalSince(started) < 10)
+    }
+
+    @Test func boundsTheOutput() async throws {
+        let out = try await ProcessRunner.run(
+            executable: "/bin/sh", arguments: ["-c", "yes 0123456789 | head -c 1000000; echo END"], timeout: 20,
+            outputLimit: 1_000, keepTail: true
+        )
+        #expect(out.stdout.count == 1_000)
+        #expect(String(decoding: out.stdout, as: UTF8.self).hasSuffix("END\n"))
+        #expect(!out.wasStopped)
+    }
+
+    @Test func checkOutputMayCarryWarnings() {
+        let check = CommandCheck(argv: ["docker", "info"], expected: "engine-1 orbstack", purpose: .dockerEngine)
+        #expect(check.isSatisfied(by: "WARNING: something\nengine-1 orbstack\n"))
+        #expect(!check.isSatisfied(by: "engine-1 orbstack-2\n"))
+        #expect(!check.isSatisfied(by: ""))
     }
 }

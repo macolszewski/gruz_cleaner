@@ -1,19 +1,23 @@
 import Foundation
 
 /// Paths that must never be removed, regardless of what a rule says.
+///
+/// Checked for every candidate path during a scan, so the protected sets are built once in `init`.
 public struct Denylist: Sendable {
-    public var home: String
+    public let home: String
     /// User-configured project roots; the roots themselves are protected, their artifacts are not.
-    public var protectedRoots: [String]
+    public let protectedRoots: [String]
+    private let exactPaths: Set<String>
+    private let forbiddenSubtrees: [String]
+    /// Roots under which removal may happen at all.
+    private let allowedRoots: [String]
+    private let preserved: [(pattern: String, fixedDir: String)]
 
     public init(home: String = Paths.home, protectedRoots: [String] = []) {
-        self.home = home
-        self.protectedRoots = protectedRoots.map { Paths.expand($0, home: home) }
-    }
-
-    private var exactPaths: Set<String> {
         let h = home
-        var set: Set<String> = [
+        self.home = h
+        self.protectedRoots = protectedRoots.map { Paths.expand($0, home: h) }
+        var exact: Set<String> = [
             "/", "/Applications", "/Library", "/Users", "/opt", "/opt/homebrew", "/private", "/private/var",
             "/private/var/folders", "/Volumes",
             h, "\(h)/Library", "\(h)/Library/Application Support", "\(h)/Library/Caches", "\(h)/Library/Containers",
@@ -23,24 +27,43 @@ public struct Denylist: Sendable {
             "\(h)/.Trash",
             Paths.userTempDir,
         ]
-        set.formUnion(ScanOptions.commonProjectRoots.map { Paths.expand($0, home: h) })
-        set.formUnion(protectedRoots)
-        return set
-    }
-
-    private var forbiddenSubtrees: [String] {
-        let h = home
-        return [
+        exact.formUnion(ScanOptions.commonProjectRoots.map { Paths.expand($0, home: h) })
+        exact.formUnion(self.protectedRoots)
+        exactPaths = exact
+        forbiddenSubtrees = [
             "/System", "/bin", "/sbin", "/usr", "/etc", "/private/etc", "/cores", "/dev",
             "\(h)/Library/Keychains", "\(h)/Library/Mobile Documents", "\(h)/Library/CloudStorage",
             "\(h)/Library/Mail", "\(h)/Library/Messages", "\(h)/Library/Photos",
             "\(h)/.ssh", "\(h)/.gnupg", "\(h)/Documents", "\(h)/Desktop", "\(h)/Pictures",
         ]
+        allowedRoots = [h, "/private/var/folders", "/var/folders", "/opt/homebrew/share/android-commandlinetools"]
+        preserved = Self.preservedPatterns.map { pattern in
+            let expanded = Paths.expand(pattern, home: h)
+            let fixed = expanded.prefix { $0 != "*" && $0 != "?" && $0 != "[" }
+            let fixedDir = fixed.hasSuffix("/") ? String(fixed.dropLast()) : (String(fixed) as NSString).deletingLastPathComponent
+            return (expanded, fixedDir)
+        }
     }
 
-    /// Roots under which removal may happen at all.
-    private var allowedRoots: [String] {
-        [home, "/private/var/folders", "/var/folders", "/opt/homebrew/share/android-commandlinetools"]
+    /// Data kept inside otherwise disposable folders. A path is denied when it is one of these, lies
+    /// inside one or contains one, so a broad cache rule cannot take it along with its parent.
+    private static let preservedPatterns = [
+        // JetBrains keeps Local History (recovery of deleted files and uncommitted changes) in its cache folder.
+        "~/Library/Caches/JetBrains/*/LocalHistory",
+        "~/Library/Caches/Google/AndroidStudio*/LocalHistory",
+        // Hugging Face stores the login token next to its model cache.
+        "~/.cache/huggingface/token",
+        "~/.cache/huggingface/stored_tokens",
+    ]
+
+    private func preservedLocation(insideOrAbove path: String) -> String? {
+        // Cheap prefix test first: only patterns that share the fixed part of the path need a file system check.
+        for (pattern, fixedDir) in preserved where Paths.isWithin(path, fixedDir) || Paths.isWithin(fixedDir, path) {
+            if let hit = Paths.glob(pattern, home: home).first(where: { Paths.isWithin(path, $0) || Paths.isWithin($0, path) }) {
+                return hit
+            }
+        }
+        return nil
     }
 
     /// `denied` carries a reason shown to the user.
@@ -62,12 +85,20 @@ public struct Denylist: Sendable {
         guard allowedRoots.contains(where: { Paths.isWithin(path, $0) && path != $0 }) else {
             return .denied(String(localized: "Outside the allowed area", bundle: .scannerKit))
         }
+        // A link inside the path would make a rule describe something it never saw (a cache folder that is
+        // really a project's source folder), wherever the link points.
+        if Paths.hasSymlinkedAncestor(path, home: home) {
+            return .denied(String(localized: "A folder in the path is a symbolic link", bundle: .scannerKit))
+        }
+        if let kept = preservedLocation(insideOrAbove: path) {
+            return .denied(String(localized: "Contains data that cannot be recreated: \(Paths.abbreviate(kept))", bundle: .scannerKit))
+        }
         // Resolve symlinks in parent components so a link cannot redirect removal elsewhere.
         let parent = (path as NSString).deletingLastPathComponent
         let resolvedParent = (parent as NSString).resolvingSymlinksInPath
         if resolvedParent != parent {
             let resolved = Paths.join(resolvedParent, (path as NSString).lastPathComponent)
-            if case .denied(let why) = Denylist(home: home, protectedRoots: protectedRoots).checkResolved(resolved) {
+            if case .denied(let why) = checkResolved(resolved) {
                 return .denied(String(localized: "A symbolic link leads to a protected location: \(why)", bundle: .scannerKit))
             }
         }

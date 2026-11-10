@@ -29,59 +29,11 @@ enum ReadOnlyCommand {
     }
 }
 
-/// Minimal process launcher. Internal so other modules cannot reach it through ScannerKit.
+/// Process launcher for read-only commands. Internal so other modules cannot reach it through ScannerKit.
 enum Subprocess {
     static func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> CommandOutput {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: executable)
-                process.arguments = arguments
-                process.environment = ExecutableLocator.environment
-                let out = Pipe(), err = Pipe()
-                process.standardOutput = out
-                process.standardError = err
-                process.standardInput = FileHandle.nullDevice
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                let timer = DispatchWorkItem { if process.isRunning { process.terminate() } }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timer)
-                // Drain pipes before waiting, otherwise large output blocks the child.
-                let stdoutBox = DataBox(), stderrBox = DataBox()
-                let group = DispatchGroup()
-                group.enter()
-                DispatchQueue.global().async {
-                    stdoutBox.data = out.fileHandleForReading.readDataToEndOfFile()
-                    group.leave()
-                }
-                group.enter()
-                DispatchQueue.global().async {
-                    stderrBox.data = err.fileHandleForReading.readDataToEndOfFile()
-                    group.leave()
-                }
-                process.waitUntilExit()
-                group.wait()
-                let stdoutData = stdoutBox.data, stderrData = stderrBox.data
-                timer.cancel()
-                if process.terminationReason == .uncaughtSignal {
-                    continuation.resume(throwing: ReadOnlyCommandError.timedOut)
-                    return
-                }
-                continuation.resume(returning: CommandOutput(
-                    status: process.terminationStatus,
-                    stdout: stdoutData,
-                    stderr: String(decoding: stderrData, as: UTF8.self)
-                ))
-            }
-        }
+        let out = try await ProcessRunner.run(executable: executable, arguments: arguments, timeout: timeout)
+        if out.wasStopped { throw ReadOnlyCommandError.timedOut }
+        return CommandOutput(status: out.status, stdout: out.stdout, stderr: String(decoding: out.stderr, as: UTF8.self))
     }
-}
-
-/// Written by exactly one reader before `group.wait()` returns, so unsynchronized access is safe.
-private final class DataBox: @unchecked Sendable {
-    var data = Data()
 }

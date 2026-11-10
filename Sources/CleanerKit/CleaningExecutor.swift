@@ -18,6 +18,8 @@ public struct CleaningOperation: Identifiable, Sendable, Hashable {
     public var ownerBundleIDs: [String]
     public var requiresAppClosed: Bool
     public var rustArtifact: RustArtifact?
+    /// Read-only checks that must still match the scan right before the operation runs.
+    public var preconditions: [CommandCheck] = []
 
     /// Commands count as permanent: what they remove never reaches the Trash.
     public var isPermanent: Bool {
@@ -58,7 +60,8 @@ public struct CleaningPlan: Identifiable, Sendable {
             }
             return CleaningOperation(
                 id: item.id, title: item.title, app: item.app, paths: item.paths, kind: kind, sizeBytes: item.sizeBytes,
-                ownerBundleIDs: item.ownerBundleIDs, requiresAppClosed: item.requiresAppClosed, rustArtifact: item.rustArtifact
+                ownerBundleIDs: item.ownerBundleIDs, requiresAppClosed: item.requiresAppClosed, rustArtifact: item.rustArtifact,
+                preconditions: item.preconditions ?? []
             )
         }
         return CleaningPlan(operations: ops)
@@ -85,6 +88,8 @@ public struct CleaningConfirmation: Sendable {
 public struct OperationResult: Identifiable, Sendable {
     public enum Status: Sendable {
         case done
+        /// Some paths were removed and some were not; the reason lists the failures.
+        case partial(String)
         case skipped(String)
         case failed(String)
     }
@@ -92,8 +97,17 @@ public struct OperationResult: Identifiable, Sendable {
     public var id: String { operation.id }
     public var operation: CleaningOperation
     public var status: Status
-    /// Command output, or per-path errors when only some paths of the operation were removed.
+    /// Command output.
     public var output: String?
+    /// Paths of the operation that are still on disk after a partial removal.
+    public var remainingPaths: [String] = []
+
+    public init(operation: CleaningOperation, status: Status, output: String? = nil, remainingPaths: [String] = []) {
+        self.operation = operation
+        self.status = status
+        self.output = output
+        self.remainingPaths = remainingPaths
+    }
 }
 
 public struct CleaningReport: Sendable {
@@ -111,6 +125,12 @@ public struct CleaningReport: Sendable {
     public var measuredFreedBytes: Int64? {
         guard let b = freeBefore, let a = freeAfter else { return nil }
         return a - b
+    }
+
+    /// Every operation of `plan` skipped for one reason, before anything ran.
+    public static func skippingAll(_ plan: CleaningPlan, reason: String, freeBytes: Int64? = nil) -> CleaningReport {
+        CleaningReport(results: plan.operations.map { OperationResult(operation: $0, status: .skipped(reason)) },
+                       freeBefore: freeBytes, freeAfter: freeBytes)
     }
 
     public var doneCount: Int { results.filter { if case .done = $0.status { true } else { false } }.count }
@@ -137,7 +157,28 @@ public protocol RunningAppsChecking: Sendable {
 
 /// Append-only audit trail of every operation, written in English.
 public protocol OperationLogging: Sendable {
-    func record(_ line: String)
+    /// Throws when the line could not be written.
+    func record(_ line: String) throws
+}
+
+extension OperationLogging {
+    /// Writes `entry` as one JSON line with the current time.
+    func record(entry: [String: Any]) throws {
+        let stamped = entry.merging(["time": ISO8601DateFormatter().string(from: Date())]) { current, _ in current }
+        let data = try JSONSerialization.data(withJSONObject: stamped, options: [.sortedKeys])
+        try record(String(decoding: data, as: UTF8.self))
+    }
+
+    /// Writes `entry` after an operation already ran. A failure cannot undo the operation, so it is
+    /// returned as a localized note for the result instead of being lost.
+    func recordAfterRun(_ entry: [String: Any]) -> String? {
+        do {
+            try record(entry: entry)
+            return nil
+        } catch {
+            return LocalizedMessage("This result is missing from the operation log: \(error.localizedDescription)").text
+        }
+    }
 }
 
 public protocol FreeSpaceProviding: Sendable {
@@ -195,6 +236,12 @@ public struct CleaningExecutor: Sendable {
             } else if commands.locate(argv[0]) == nil {
                 problems.append(LocalizedMessage("Cannot find \(argv[0])"))
             }
+            // A command that acts on a folder (uv cache clean --cache-dir) is held to the same rules as removing it.
+            for path in op.paths {
+                if case .denied(let why) = denylist.check(path) {
+                    problems.append(LocalizedMessage(verbatim: why).prefixed(Paths.abbreviate(path)))
+                }
+            }
         }
         if let rust = op.rustArtifact {
             do { let lease = try rustGuard.acquire(rust, paths: op.paths); lease.release() }
@@ -210,19 +257,25 @@ public struct CleaningExecutor: Sendable {
         var results: [OperationResult] = []
 
         guard confirmation.planID == plan.id else {
-            let reason = LocalizedMessage("The plan was not confirmed")
-            return CleaningReport(
-                results: plan.operations.map { OperationResult(operation: $0, status: .skipped(reason.text)) },
-                freeBefore: freeBefore, freeAfter: freeBefore
-            )
+            return .skippingAll(plan, reason: LocalizedMessage("The plan was not confirmed").text, freeBytes: freeBefore)
         }
+        // Nothing is removed without a record of it: if the log cannot be written, nothing runs.
+        do {
+            try log.record(entry: ["event": "plan", "operations": String(plan.operations.count)])
+        } catch {
+            let reason = LocalizedMessage("Cannot write the operation log: \(error.localizedDescription)")
+            return .skippingAll(plan, reason: reason.text, freeBytes: freeBefore)
+        }
+        // Check outputs by argv: one `docker info` answers for every Docker operation of the plan.
+        var checkOutputs: [[String]: String?] = [:]
 
         for op in plan.operations {
             if op.isPermanent, !confirmation.permanentConfirmed {
                 results.append(finish(op, .skipped(LocalizedMessage("Permanent deletion was not confirmed"))))
                 continue
             }
-            let problems = blockerMessages(for: op)
+            var problems = blockerMessages(for: op)
+            if problems.isEmpty { problems = await preconditionProblems(for: op, outputs: &checkOutputs) }
             if !problems.isEmpty {
                 results.append(finish(op, .skipped(.joined(problems))))
                 continue
@@ -243,8 +296,28 @@ public struct CleaningExecutor: Sendable {
         return CleaningReport(results: results, freeBefore: freeBefore, freeAfter: space.freeBytes())
     }
 
+    /// Runs each read-only check of `op` (reusing outputs already in `outputs`) and reports those whose
+    /// output no longer matches the scan.
+    func preconditionProblems(for op: CleaningOperation, outputs: inout [[String]: String?]) async -> [LocalizedMessage] {
+        var problems: [LocalizedMessage] = []
+        for check in op.preconditions {
+            guard CommandPolicy.isAllowedCheckCommand(check.argv), let executable = commands.locate(check.argv[0]) else {
+                problems.append(LocalizedMessage("Cannot verify the item before removing it. Scan again."))
+                continue
+            }
+            if outputs[check.argv] == nil {
+                let result = try? await commands.run(executable: executable, arguments: Array(check.argv.dropFirst()))
+                outputs[check.argv] = result.flatMap { $0.status == 0 ? $0.output : nil }
+            }
+            if let output = outputs[check.argv] ?? nil, check.isSatisfied(by: output) { continue }
+            problems.append(check.purpose.mismatch)
+        }
+        return problems
+    }
+
     private enum Outcome {
         case done
+        case partial(LocalizedMessage)
         case skipped(LocalizedMessage)
         case failed(LocalizedMessage)
     }
@@ -253,6 +326,7 @@ public struct CleaningExecutor: Sendable {
         switch op.kind {
         case .trash, .permanentDelete:
             var errors: [LocalizedMessage] = []
+            var remaining: [String] = []
             var anyDone = false
             for path in op.paths {
                 guard Paths.exists(path) else {
@@ -264,13 +338,12 @@ public struct CleaningExecutor: Sendable {
                     anyDone = true
                 } catch {
                     errors.append(LocalizedMessage(error).prefixed(Paths.abbreviate(path)))
+                    remaining.append(path)
                 }
             }
             if errors.isEmpty { return finish(op, .done) }
-            // A partial removal counts as done; the paths that failed are listed in the output.
             let summary = LocalizedMessage.joined(errors)
-            return finish(op, anyDone ? .done : .failed(summary),
-                          output: anyDone ? errors.map(\.text).joined(separator: "\n") : nil)
+            return finish(op, anyDone ? .partial(summary) : .failed(summary), remainingPaths: remaining)
         case .command(let argv):
             guard let executable = commands.locate(argv[0]) else {
                 return finish(op, .failed(LocalizedMessage("Cannot find \(argv[0])")))
@@ -286,13 +359,16 @@ public struct CleaningExecutor: Sendable {
     }
 
     /// Logs the outcome in English and returns the localized result for the UI.
-    private func finish(_ op: CleaningOperation, _ outcome: Outcome, output: String? = nil) -> OperationResult {
+    private func finish(_ op: CleaningOperation, _ outcome: Outcome, output: String? = nil, remainingPaths: [String] = []) -> OperationResult {
         let status: OperationResult.Status
         let logStatus: String
         switch outcome {
         case .done:
             status = .done
             logStatus = "done"
+        case .partial(let why):
+            status = .partial(why.text)
+            logStatus = "partial: \(why.english)"
         case .skipped(let why):
             status = .skipped(why.text)
             logStatus = "skipped: \(why.english)"
@@ -305,16 +381,25 @@ public struct CleaningExecutor: Sendable {
         case .permanentDelete: "delete \(op.paths.joined(separator: ", "))"
         case .command(let argv): "run \(argv.joined(separator: " "))"
         }
-        let entry: [String: String] = [
-            "time": ISO8601DateFormatter().string(from: Date()),
+        var entry: [String: Any] = [
             "item": op.id,
             "bytes": String(op.sizeBytes),
             "action": what,
             "status": logStatus,
         ]
-        if let data = try? JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys]) {
-            log.record(String(decoding: data, as: UTF8.self))
+        if let output, !output.isEmpty { entry["output"] = output }
+        let note = log.recordAfterRun(entry)
+        let shownOutput = note.map { [output, $0].compactMap { $0 }.joined(separator: "\n") } ?? output
+        return OperationResult(operation: op, status: status, output: shownOutput, remainingPaths: remainingPaths)
+    }
+}
+
+extension CommandCheck.Purpose {
+    /// Why the operation is skipped when the check no longer matches the scan.
+    var mismatch: LocalizedMessage {
+        switch self {
+        case .dockerEngine: LocalizedMessage("Docker now connects to a different engine than the one scanned. Scan again.")
+        case .dockerImage: LocalizedMessage("The image tag now points to a different image. Scan again.")
         }
-        return OperationResult(operation: op, status: status, output: output)
     }
 }

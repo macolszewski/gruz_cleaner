@@ -4,15 +4,21 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    name: Build and test
-    runs-on: macos-26
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-15 is the oldest supported system; macos-26 is the one release builds are made on.
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,11 +31,24 @@ jobs:
       - name: Swift tests
         run: swift test
 
-      - name: Python helper tests
-        run: python3 -m unittest discover -s Tests/ClaudeMemoryReindexTests -v
+      - name: App bundle
+        run: ./scripts/build-app.sh
+
+  checks:
+    name: Python helper and localizations
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      # Same packages as ClaudeMemoryRuntime, so the real Chroma rebuild and query test runs.
+      - name: Python helper tests (with real Chroma)
+        env:
+          CLEANER_TEST_CHROMA: "1"
+        run: >
+          uv run --no-project --with "chromadb==1.5.9" --with "onnxruntime>=1.20" --with "protobuf<7"
+          python -m unittest discover -s Tests/ClaudeMemoryReindexTests -v
 
       - name: Localizations
         run: ./scripts/check-localizations.py
-
-      - name: App bundle
-        run: ./scripts/build-app.sh

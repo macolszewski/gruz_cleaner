@@ -72,6 +72,12 @@
 "A full rebuild supports only a local Chroma with the default embedding model. A remote or custom index needs separate handling." = "Pełna przebudowa obsługuje lokalną Chromę z domyślnym modelem embeddingów. Zdalny lub niestandardowy indeks wymaga osobnej obsługi.";
 "Could not prepare indexing: %@" = "Nie udało się przygotować indeksowania: %@";
 "Rebuilding Chroma failed: %@" = "Przebudowa Chroma nie powiodła się: %@";
-"The preserved index does not match the database: %@" = "Zachowany indeks nie odpowiada bazie: %@";
 "Could not start claude-mem: %@" = "Nie udało się uruchomić claude-mem: %@";
 "The worker did not report that it is ready after starting." = "Worker nie potwierdził gotowości po uruchomieniu.";
+"Cannot verify the item before removing it. Scan again." = "Nie można sprawdzić elementu przed usunięciem. Wykonaj nowy skan.";
+"Cannot write the operation log: %@" = "Nie można zapisać dziennika operacji: %@";
+"Docker now connects to a different engine than the one scanned. Scan again." = "Docker łączy się teraz z innym silnikiem niż podczas skanu. Wykonaj nowy skan.";
+"The command was stopped before it finished; part of the data may already be removed." = "Polecenie zostało przerwane przed zakończeniem; część danych mogła już zostać usunięta.";
+"The image tag now points to a different image. Scan again." = "Tag wskazuje teraz inny obraz. Wykonaj nowy skan.";
+"This result is missing from the operation log: %@" = "Tego wyniku brakuje w dzienniku operacji: %@";
+"The index does not match the database: %@" = "Indeks nie odpowiada bazie: %@";

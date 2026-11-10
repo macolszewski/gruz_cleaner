@@ -47,7 +47,7 @@ enum SimulatorSource {
                 paths: [path], action: .command(argv: ["xcrun", "simctl", "delete", device.udid]),
                 ownerBundleIDs: ["com.apple.iphonesimulator"],
                 note: device.state == "Booted" ? String(localized: "The simulator is running", bundle: .scannerKit) : nil
-            )
+            ).measured(info)
         }.sorted { $0.sizeBytes > $1.sizeBytes }
         guard !children.isEmpty else { return [] }
         return [ScanItem(

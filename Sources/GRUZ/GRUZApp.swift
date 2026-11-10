@@ -12,7 +12,10 @@ struct GRUZApp: App {
                 .environment(model)
                 .environment(\.locale, Formatters.locale)
                 .frame(minWidth: 1000, minHeight: 620)
-                .task { model.scan() }
+                .task {
+                    delegate.model = model
+                    model.scan()
+                }
         }
         .defaultSize(width: 1280, height: 800)
         .commands {
@@ -22,7 +25,7 @@ struct GRUZApp: App {
                     if model.showingClaudeMemory { model.claudeMemory.scan() } else { model.scan() }
                 }
                     .keyboardShortcut("r")
-                    .disabled(model.showingClaudeMemory ? model.claudeMemory.isLoading || model.claudeMemory.isRunning : model.isScanning)
+                    .disabled(model.showingClaudeMemory ? model.claudeMemory.isLoading || model.claudeMemory.isRunning : !model.canScan)
                 Button("Deselect All") { model.clearSelection() }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
             }
@@ -38,6 +41,8 @@ struct GRUZApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var model: AppModel?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Needed when launched as a bare binary (swift run) rather than from the .app bundle.
         NSApp.setActivationPolicy(.regular)
@@ -45,4 +50,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    /// Quitting in the middle of a removal would leave it half done with no result shown.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard MainActor.assumeIsolated({ model?.isBusy }) == true else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "GRUZ is still removing data")
+        alert.informativeText = String(localized: "Quit after it finishes, so every result is shown and logged.")
+        alert.runModal()
+        return .terminateCancel
+    }
 }

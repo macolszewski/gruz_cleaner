@@ -124,3 +124,6 @@
 "A record has an invalid identifier or date." = "Rekord ma nieprawidłowy identyfikator lub datę.";
 "SQLite read error: %@" = "Błąd odczytu SQLite: %@";
 "no connection" = "brak połączenia";
+"A folder in the path is a symbolic link" = "Jeden z katalogów w ścieżce jest dowiązaniem symbolicznym";
+"Contains data that cannot be recreated: %@" = "Zawiera dane, których nie da się odtworzyć: %@";
+"Docker: could not identify the engine, so Docker items cannot be removed in this scan." = "Docker: nie udało się ustalić, z którym silnikiem łączy się CLI, więc w tym skanie elementów Dockera nie można usunąć.";

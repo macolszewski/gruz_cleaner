@@ -15,10 +15,12 @@
       "argv": [
         "uv",
         "cache",
-        "clean"
+        "clean",
+        "--cache-dir",
+        "{path}"
       ]
     },
-    "note": "Runs the official uv cache clean command."
+    "note": "Runs uv cache clean on exactly this folder."
   },
   {
     "id": "npm.cacache",
@@ -420,9 +422,9 @@
     "category": "packages",
     "app": "Maven",
     "title": "Local Maven repository",
-    "description": "Downloaded Java libraries.",
-    "regeneration": "mvn downloads them again.",
-    "safety": "regenerable",
+    "description": "Java libraries downloaded by Maven, together with artifacts installed locally (mvn install, install:install-file). Locally installed artifacts may exist nowhere else.",
+    "regeneration": "Maven downloads public libraries again. Your own installed artifacts come back only if you build or install them again.",
+    "safety": "caution",
     "paths": [
       "~/.m2/repository"
     ],

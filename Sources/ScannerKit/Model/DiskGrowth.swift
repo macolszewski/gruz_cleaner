@@ -16,7 +16,9 @@ public struct UsageSnapshot: Codable, Sendable {
     public init(date: Date, scope: String, items: [ScanItem]) {
         self.date = date
         self.scope = scope
-        self.sizes = Dictionary(items.flatMap(\.leaves).map { ($0.id, $0.sizeBytes) }, uniquingKeysWith: { a, _ in a })
+        // A partly read item is no baseline: once it can be read in full it would look like growth.
+        let measured = items.flatMap(\.leaves).filter { $0.isPartiallyMeasured != true }
+        self.sizes = Dictionary(measured.map { ($0.id, $0.sizeBytes) }, uniquingKeysWith: { a, _ in a })
     }
 }
 
@@ -27,7 +29,7 @@ public enum UsageHistory {
             var copy = item
             copy.growth = nil
             copy.children = annotate(item.children, baseline: baseline)
-            if let baseline, let previous = baseline.sizes[item.id], !item.isGroup {
+            if let baseline, let previous = baseline.sizes[item.id], !item.isGroup, item.isPartiallyMeasured != true {
                 copy.growth = DiskGrowth(baselineDate: baseline.date, previousBytes: previous, deltaBytes: item.sizeBytes - previous)
             } else if item.isGroup, let date = copy.children.first?.growth?.baselineDate,
                       copy.children.allSatisfy({ $0.growth?.baselineDate == date }) {
