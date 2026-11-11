@@ -12,15 +12,21 @@ if arguments.contains("-h") || arguments.contains("--help") {
       --root <folder>    project folder to scan; repeatable. Default: the common project
                          folders that exist (~/Developer, ~/workspace, ~/Projects, ~/code, ...)
       --children         show nested items
+      --stats            print counts of file system work to stderr
+      --fs-width <n>     folder walks allowed at the same time (default \(IOPool.defaultWidth))
     """)
     exit(0)
 }
 
 var roots: [String] = []
+var fileSystemWidth = IOPool.defaultWidth
 var index = 0
 while index < arguments.count {
     if arguments[index] == "--root", index + 1 < arguments.count {
         roots.append(arguments[index + 1])
+        index += 1
+    } else if arguments[index] == "--fs-width", index + 1 < arguments.count, let width = Int(arguments[index + 1]), width > 0 {
+        fileSystemWidth = width
         index += 1
     }
     index += 1
@@ -34,9 +40,13 @@ do {
     exit(1)
 }
 
-let scanner = Scanner(catalog: catalog, options: ScanOptions(projectRoots: roots.isEmpty ? nil : roots))
+let scanner = Scanner(catalog: catalog, options: ScanOptions(projectRoots: roots.isEmpty ? nil : roots, fileSystemWidth: fileSystemWidth))
 let result = await scanner.scan { stage, done in
     if !done { FileHandle.standardError.write(Data("… \(stage.title)\n".utf8)) }
+}
+if arguments.contains("--stats") {
+    let lines = ScanMetrics.shared.report.map { "\($0.name): \($0.value)" }
+    FileHandle.standardError.write(Data((["scan time: \(String(format: "%.2f", result.finishedAt.timeIntervalSince(result.startedAt))) s"] + lines).joined(separator: "\n").utf8 + [10]))
 }
 
 if arguments.contains("--json") {

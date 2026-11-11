@@ -27,13 +27,25 @@ Build and test commands are in the [README](https://github.com/macolszewski/gruz
 
 | Order | Source | What it reports |
 |---|---|---|
-| 1 (parallel) | `DockerSource` | Unused images, stopped containers, unused volumes and BuildKit cache, read from `docker --host <endpoint> system df -v --format '{{json .}}'`. Also the Docker VM disk image (OrbStack or Docker Desktop) as an informational item. |
-| 1 (parallel) | `SimulatorSource` | Simulator devices from `xcrun simctl list devices --json`, titled by device name and runtime instead of UUID. Devices for a runtime that is no longer installed are `safe`, others `caution`. |
+| 1 (alongside 2-4) | `DockerSource` | Unused images, stopped containers, unused volumes and BuildKit cache, read from `docker --host <endpoint> system df -v --format '{{json .}}'`. Also the Docker VM disk image (OrbStack or Docker Desktop) as an informational item. |
+| 1 (alongside 2-4) | `SimulatorSource` | Simulator devices from `xcrun simctl list devices --json`, titled by device name and runtime instead of UUID. Devices for a runtime that is no longer installed are `safe`, others `caution`. |
 | 2 | `RuleSource` | Known locations from the rule catalog (`rules-*.json`). See [rules.md](rules.md). |
 | 3 (parallel) | `ProjectSource` | Regenerable folders inside project folders (`artifacts.json`), plus Rust/Cargo targets (see [rust.md](../guide/rust.md)). |
 | 3 (parallel) | `ApplicationsSource` | Installed `.app` bundles in `/Applications` and `~/Applications`. Informational only. |
 | 4 | `OrphanSource` | Library folders of apps that are no longer installed (`orphans.json`). |
-| 5 | `UnrecognizedSource` | Large folders no rule describes. Informational only. |
+| 5 | `UnrecognizedSource` | Large folders no rule describes. Informational only. Starts after every other source, Docker and simulators included, has finished. |
+
+Docker and simulators claim their storage before anything else runs, but their CLI queries (`docker system df -v` can take minutes with many volumes) run alongside the rules, projects and leftovers instead of holding them back.
+
+### File system work
+
+A scan spends most of its time walking folders, so the sources share three things for the duration of one scan (`ScanContext`):
+
+- **One limit on parallel walks.** Every `fts` walk (measurements, project discovery, Rust profiles) runs on one `IOPool`, outside Swift Concurrency's cooperative threads, which a blocking walk would otherwise occupy. The default of 8 parallel walks was the fastest of 1, 2, 4 and 8 for a full scan on an Apple silicon Mac with an internal SSD (`gruz-scan --stats --fs-width <n>`); 1 took three times as long. Cancelling the scan reaches running walks through an explicit flag.
+- **A scan cache** (`ScanCache`) of directory listings, expanded patterns of preserved data (`Denylist`) and finished measurements. Ten JetBrains cache patterns list the same product folders once; a leftover candidate that turned out too small is not measured again as an unrecognized folder. A measurement is reused only for the same path with the same exclusions. Nothing from the cache reaches the checks made before removal, which always read the disk.
+- **One project walk** (`ProjectDiscovery`) that looks for build artifacts and Cargo manifests at the same time. The two searches prune different folders and go to different depths; the walk descends wherever at least one of them still looks and evaluates each folder only for the searches that would have reached it, so each finds exactly what it found on its own. Exact duplicate project folders are walked once.
+
+`gruz-scan --stats` prints the counts of this work, and each stage is an `OSSignposter` interval (subsystem `GRUZ`) for Instruments.
 
 ### Claim registry and overlap
 
@@ -46,7 +58,7 @@ A location must be reported once, by the most specific source. `ClaimRegistry` (
 
 ### Sources in more detail
 
-**Project artifacts.** `ProjectSource` walks the configured project folders with `fts`, without following symlinks or crossing volumes, up to 12 levels deep. It skips `.git`, `~/Library` and hidden folders other than artifact names and `.claude`. A folder name alone is not enough: each artifact definition has context conditions (`node_modules` next to `package.json`, `bin`/`obj` next to a `*.csproj`, `.venv` containing `pyvenv.cfg`, `build` next to `pubspec.yaml`, `build.gradle`, `CMakeLists.txt` and similar). A `build` folder must also contain files a build tool generates (`CMakeCache.txt`, `intermediates`, `bdist.*` and similar) and no source files at its top level, because a Python package may itself be called `build`. Without the context check, a `bin` folder with scripts or a `build` folder with sources would be offered for removal. The walk does not descend into a recognized artifact.
+**Project artifacts.** `ProjectSource` walks the configured project folders with `fts` (one walk shared with the Cargo search, see [File system work](#file-system-work)), without following symlinks or crossing volumes, up to 12 levels deep. It skips `.git`, `~/Library` and hidden folders other than artifact names and `.claude`. A folder name alone is not enough: each artifact definition has context conditions (`node_modules` next to `package.json`, `bin`/`obj` next to a `*.csproj`, `.venv` containing `pyvenv.cfg`, `build` next to `pubspec.yaml`, `build.gradle`, `CMakeLists.txt` and similar). A `build` folder must also contain files a build tool generates (`CMakeCache.txt`, `intermediates`, `bdist.*` and similar) and no source files at its top level, because a Python package may itself be called `build`. Without the context check, a `bin` folder with scripts or a `build` folder with sources would be offered for removal. The walk does not descend into a recognized artifact.
 
 Agent worktrees (`.claude/worktrees/*`) are listed one per worktree with a `git status --porcelain` summary in the item note, because a worktree may hold uncommitted work. Git runs with `--no-optional-locks`, `core.fsmonitor=false` and `core.untrackedCache=false`, so a read-only scan neither starts a configured fsmonitor program nor rewrites the index.
 

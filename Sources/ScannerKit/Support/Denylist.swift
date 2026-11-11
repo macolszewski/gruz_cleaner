@@ -62,10 +62,10 @@ public struct Denylist: Sendable {
         case unknown(String)
     }
 
-    private func preservedLocation(insideOrAbove path: String) -> Preserved? {
+    private func preservedLocation(insideOrAbove path: String, cache: ScanCache?) -> Preserved? {
         // Cheap prefix test first: only patterns that share the fixed part of the path need a file system check.
         for (pattern, fixedDir) in preserved where Paths.isWithin(path, fixedDir) || Paths.isWithin(fixedDir, path) {
-            let result = Paths.globReporting(pattern, home: home)
+            let result = cache?.glob(pattern, home: home) ?? Paths.globReporting(pattern, home: home)
             if let hit = result.matches.first(where: { Paths.isWithin(path, $0) || Paths.isWithin($0, path) }) {
                 return .found(hit)
             }
@@ -82,7 +82,10 @@ public struct Denylist: Sendable {
         case denied(String)
     }
 
-    public func check(_ rawPath: String) -> Verdict {
+    public func check(_ rawPath: String) -> Verdict { check(rawPath, cache: nil) }
+
+    /// - Parameter cache: a scan's shared answers; checks before removal pass none and read the disk.
+    func check(_ rawPath: String, cache: ScanCache?) -> Verdict {
         let path = Paths.normalize(rawPath)
         guard path.hasPrefix("/") else { return .denied(String(localized: "The path is not absolute", bundle: .scannerKit)) }
         if path.split(separator: "/").contains(where: { $0 == ".git" }) {
@@ -100,7 +103,7 @@ public struct Denylist: Sendable {
         if Paths.hasSymlinkedAncestor(path, home: home) {
             return .denied(String(localized: "A folder in the path is a symbolic link", bundle: .scannerKit))
         }
-        switch preservedLocation(insideOrAbove: path) {
+        switch preservedLocation(insideOrAbove: path, cache: cache) {
         case .found(let kept):
             return .denied(String(localized: "Contains data that cannot be recreated: \(Paths.abbreviate(kept))", bundle: .scannerKit))
         case .unknown(let blind):

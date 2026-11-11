@@ -4,11 +4,15 @@ public struct ScanOptions: Sendable {
     public var projectRoots: [String]
     public var unrecognizedMinimumMB: Int
     public var home: String
+    /// Folder walks allowed to run at the same time across the whole scan.
+    public var fileSystemWidth: Int
 
-    public init(projectRoots: [String]? = nil, unrecognizedMinimumMB: Int = 100, home: String = Paths.home) {
+    public init(projectRoots: [String]? = nil, unrecognizedMinimumMB: Int = 100, home: String = Paths.home,
+                fileSystemWidth: Int = IOPool.defaultWidth) {
         self.projectRoots = projectRoots ?? Self.defaultProjectRoots(home: home)
         self.unrecognizedMinimumMB = unrecognizedMinimumMB
         self.home = home
+        self.fileSystemWidth = fileSystemWidth
     }
 
     /// Folders developers commonly keep their code in. They are always protected from removal.
@@ -78,6 +82,26 @@ struct ScanContext: Sendable {
     let claims: ClaimRegistry
     let denylist: Denylist
     let warnings: WarningSink
+    let cache: ScanCache
+    let pool: IOPool
+
+    init(catalog: RuleCatalog, options: ScanOptions, claims: ClaimRegistry, denylist: Denylist, warnings: WarningSink) {
+        self.catalog = catalog
+        self.options = options
+        self.claims = claims
+        self.denylist = denylist
+        self.warnings = warnings
+        cache = ScanCache()
+        pool = IOPool(width: options.fileSystemWidth)
+    }
+
+    func isAllowed(_ path: String) -> Bool { denylist.check(path, cache: cache) == .allowed }
+
+    func measure(_ path: String, excluding: Set<String> = []) async -> SizeInfo {
+        await cache.measure(path, excluding: excluding, pool: pool)
+    }
+
+    func measureAll(_ paths: [String]) async -> [String: SizeInfo] { await cache.measureAll(paths, pool: pool) }
 }
 
 actor WarningSink {

@@ -94,7 +94,7 @@ struct SelectionBar: View {
     @Binding var showingReview: Bool
 
     var body: some View {
-        let count = model.selectedLeaves.count
+        let (count, bytes) = model.selectionSummary
         HStack(spacing: 12) {
             Image(systemName: count == 0 ? "checklist.unchecked" : "checklist.checked")
                 .foregroundStyle(count == 0 ? Color.secondary : Color.accentColor)
@@ -102,7 +102,7 @@ struct SelectionBar: View {
                 Text("Nothing is selected. Select the items you want to remove.")
                     .foregroundStyle(.secondary)
             } else {
-                Text("Selected: **\(model.selectedBytes.formattedBytes)**")
+                Text("Selected: **\(bytes.formattedBytes)**")
                 Text("(\(count) items)").foregroundStyle(.secondary)
                 Button("Clear Selection") { model.clearSelection() }
                     .buttonStyle(.link)

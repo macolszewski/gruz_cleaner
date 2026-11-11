@@ -52,7 +52,7 @@ Each component is measured with `lstat` metadata only. File contents are never r
 - allocated size, counting each `(device, inode)` once;
 - the newest modification time;
 - the size of files created since the start of yesterday (local time), used by the growth view;
-- a signature: a SHA-256 over the path, inode, mode, size, blocks, link count and timestamps of every entry, used to detect changes before removal.
+- a signature: a SHA-256 over the path, inode, mode, size, blocks, link count and timestamps of every entry, used to detect changes before removal. Entries are visited in byte order of their names within each folder and hashed as they are read, so the walk does not keep the whole tree in memory. The signature starts with its format (`v2:`); a selection kept from an older version never matches and needs a new scan.
 
 A component gets no action, and shows the reason in its note, when the walk finds:
 

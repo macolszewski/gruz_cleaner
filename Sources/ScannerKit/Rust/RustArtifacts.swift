@@ -25,43 +25,69 @@ public struct RustTreeMeasurement: Sendable {
 public enum RustArtifacts {
     public static let components: Set<String> = ["deps", "incremental", "build", ".fingerprint", "examples"]
 
+    /// Prefix of the current signature format. A signature from another format never matches, so a
+    /// selection made by an older version must be scanned again before removal.
+    static let signatureFormat = "v2:"
+
     /// Reads metadata only; never follows links, crosses devices or runs Cargo/build scripts.
-    public static func measure(_ path: String, since: Date) -> RustTreeMeasurement {
+    ///
+    /// The signature covers every entry's path, type, identity, size, link count and times. Entries are
+    /// visited in name order within each folder and hashed as they are read, so memory does not grow
+    /// with the size of the tree.
+    public static func measure(_ path: String, since: Date, cancellation: CancellationFlag? = nil) -> RustTreeMeasurement {
         var result = RustTreeMeasurement()
         var rootStat = stat()
         guard lstat(path, &rootStat) == 0, rootStat.st_mode & S_IFMT == S_IFDIR else {
             result.problem = String(localized: "The folder is gone or is a symbolic link. Scan again.", bundle: .scannerKit)
             return result
         }
-        var records: [String] = []
-        var seen = Set<String>()
         let root = strdup(path)
         defer { free(root) }
         var argv: [UnsafeMutablePointer<CChar>?] = [root, nil]
-        guard let tree = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, nil) else {
+        guard let tree = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, compareNames) else {
             result.problem = String(localized: "The folder cannot be read.", bundle: .scannerKit)
             return result
         }
         defer { fts_close(tree) }
+        var hash = SHA256()
+        var record: [UInt8] = []
+        record.reserveCapacity(512)
+        // Only files with several links can be met twice; their blocks are counted once.
+        var linked = Set<FileIdentity>()
+        var visited = 0
+        defer { ScanMetrics.shared.add(.measuredEntries, visited) }
         while let entry = fts_read(tree) {
-            if Task.isCancelled { result.problem = String(localized: "Measurement canceled.", bundle: .scannerKit); break }
+            visited += 1
+            if visited % 1024 == 0, cancellation?.isCancelled ?? Task.isCancelled {
+                result.problem = String(localized: "Measurement canceled.", bundle: .scannerKit)
+                break
+            }
             let kind = Int32(entry.pointee.fts_info)
             if kind == FTS_DP { continue }
-            guard [FTS_D, FTS_F].contains(kind), let ptr = entry.pointee.fts_statp else {
+            guard kind == FTS_D || kind == FTS_F, let ptr = entry.pointee.fts_statp else {
                 result.problem = String(localized: "Incomplete measurement: a link or special file was found. Review it manually.", bundle: .scannerKit)
                 continue
             }
             let s = ptr.pointee
-            let full = String(cString: entry.pointee.fts_path)
-            let name = (full as NSString).lastPathComponent
+            let pathBytes = UnsafeRawBufferPointer(start: entry.pointee.fts_path, count: Int(entry.pointee.fts_pathlen))
             if s.st_dev != rootStat.st_dev { result.problem = String(localized: "The folder spans another volume.", bundle: .scannerKit) }
-            if [".git", "Cargo.toml", "Cargo.lock", "config.json", "session.json"].contains(name)
-                || ["app", "db", "sqlite", "sqlite3", "sql"].contains((name as NSString).pathExtension.lowercased()) {
+            if isProtectedName(lastComponent(of: pathBytes)) {
                 result.problem = String(localized: "Data or an app bundle was found. GRUZ will not remove this subfolder.", bundle: .scannerKit)
             }
-            let identity = "\(s.st_dev):\(s.st_ino)"
-            records.append("\(full)\u{0}\(identity):\(s.st_mode):\(s.st_size):\(s.st_blocks):\(s.st_nlink):\(s.st_mtimespec.tv_sec):\(s.st_mtimespec.tv_nsec):\(s.st_ctimespec.tv_sec):\(s.st_ctimespec.tv_nsec)")
-            if seen.insert(identity).inserted {
+
+            record.removeAll(keepingCapacity: true)
+            record.append(kind == FTS_D ? 1 : 2)
+            append(UInt64(pathBytes.count), to: &record)
+            record.append(contentsOf: pathBytes)
+            let identity: [UInt64] = [UInt64(UInt32(bitPattern: s.st_dev)), s.st_ino, UInt64(s.st_mode), UInt64(s.st_nlink)]
+            let sizes: [Int64] = [s.st_size, s.st_blocks]
+            let times: [Int] = [s.st_mtimespec.tv_sec, s.st_mtimespec.tv_nsec, s.st_ctimespec.tv_sec, s.st_ctimespec.tv_nsec]
+            for value in identity { append(value, to: &record) }
+            for value in sizes { append(UInt64(bitPattern: value), to: &record) }
+            for value in times { append(UInt64(bitPattern: Int64(value)), to: &record) }
+            hash.update(data: record)
+
+            if kind == FTS_D || s.st_nlink <= 1 || linked.insert(FileIdentity(device: s.st_dev, inode: s.st_ino)).inserted {
                 let bytes = Int64(s.st_blocks) * 512
                 result.bytes += bytes
                 if kind == FTS_F, Double(s.st_birthtimespec.tv_sec) >= since.timeIntervalSince1970 { result.recentBytes += bytes }
@@ -69,18 +95,52 @@ public enum RustArtifacts {
             let modified = Date(timeIntervalSince1970: Double(s.st_mtimespec.tv_sec))
             result.newest = max(result.newest ?? .distantPast, modified)
         }
-        var hash = SHA256()
-        for record in records.sorted() { hash.update(data: Data((record + "\n").utf8)) }
-        result.signature = hash.finalize().map { String(format: "%02x", $0) }.joined()
+        result.signature = signatureFormat + hash.finalize().map { String(format: "%02x", $0) }.joined()
         return result
     }
 
-    static func items(target: String, manifestPath: String? = nil) -> ScanItem {
+    private struct FileIdentity: Hashable {
+        var device: dev_t
+        var inode: ino_t
+    }
+
+    private static func append(_ value: UInt64, to record: inout [UInt8]) {
+        withUnsafeBytes(of: value.littleEndian) { record.append(contentsOf: $0) }
+    }
+
+    /// Byte order of names, so the visiting order (and the signature) does not depend on the file system.
+    private static let compareNames: @convention(c) (
+        UnsafeMutablePointer<UnsafePointer<FTSENT>?>?, UnsafeMutablePointer<UnsafePointer<FTSENT>?>?
+    ) -> Int32 = { a, b in
+        guard let x = a?.pointee, let y = b?.pointee else { return 0 }
+        // `fts_name` is stored inline past the end of the declared struct; read it in place, never from a copy.
+        let offset = MemoryLayout<FTSENT>.offset(of: \FTSENT.fts_name)!
+        let xName = (UnsafeRawPointer(x) + offset).assumingMemoryBound(to: CChar.self)
+        let yName = (UnsafeRawPointer(y) + offset).assumingMemoryBound(to: CChar.self)
+        let xLength = Int(x.pointee.fts_namelen), yLength = Int(y.pointee.fts_namelen)
+        let order = memcmp(xName, yName, min(xLength, yLength))
+        if order != 0 { return order }
+        return xLength < yLength ? -1 : (xLength > yLength ? 1 : 0)
+    }
+
+    private static func lastComponent(of path: UnsafeRawBufferPointer) -> String {
+        let start = path.lastIndex(of: UInt8(ascii: "/")).map { $0 + 1 } ?? 0
+        return String(decoding: UnsafeRawBufferPointer(rebasing: path[start...]), as: UTF8.self)
+    }
+
+    /// Names that mean the folder holds more than build output.
+    static func isProtectedName(_ name: String) -> Bool {
+        if [".git", "Cargo.toml", "Cargo.lock", "config.json", "session.json"].contains(name) { return true }
+        return ["app", "db", "sqlite", "sqlite3", "sql"].contains((name as NSString).pathExtension.lowercased())
+    }
+
+    static func items(target: String, manifestPath: String? = nil, cancellation: CancellationFlag? = nil) -> ScanItem {
+        func isCancelled() -> Bool { cancellation?.isCancelled ?? Task.isCancelled }
         let calendar = Calendar.current
         let since = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!
         var children: [ScanItem] = []
         func visit(_ path: String, depth: Int) {
-            guard depth <= 2, !Task.isCancelled else { return }
+            guard depth <= 2, !isCancelled() else { return }
             guard let entries = try? FileManager.default.contentsOfDirectory(atPath: path).sorted() else { return }
             let isProfile = Paths.exists(Paths.join(path, ".cargo-lock")) && Paths.isDirectory(Paths.join(path, ".fingerprint"))
             if isProfile {
@@ -88,7 +148,7 @@ public enum RustArtifacts {
                 var parts: [ScanItem] = []
                 for name in entries where components.contains(name) && Paths.isDirectory(Paths.join(path, name)) {
                     let part = Paths.join(path, name)
-                    let measured = measure(part, since: since)
+                    let measured = measure(part, since: since, cancellation: cancellation)
                     guard measured.bytes > 0 || measured.problem != nil else { continue }
                     var item = ScanItem(
                         id: "rust:\(part)", ruleID: "artifact.rust-target", category: .rust,
@@ -106,7 +166,7 @@ public enum RustArtifacts {
                     .filter { ![".cargo-lock", ".DS_Store"].contains($0) }
                 for name in retained {
                     let full = Paths.join(path, name)
-                    let info = SizeCalculator.measure(full)
+                    let info = SizeCalculator.measure(full, cancellation: cancellation)
                     guard info.allocatedBytes > 0 else { continue }
                     parts.append(ScanItem(id: "rust:retained:\(full)", category: .rust, title: String(localized: "Kept: \(name)", bundle: .scannerKit),
                         description: String(localized: "Build output or other profile contents. Not included in Rust cache cleanup.", bundle: .scannerKit),
@@ -128,7 +188,7 @@ public enum RustArtifacts {
         }
         visit(target, depth: 0)
         if children.isEmpty {
-            let info = SizeCalculator.measure(target)
+            let info = SizeCalculator.measure(target, cancellation: cancellation)
             children = [ScanItem(id: "rust:unknown:\(target)", category: .rust, title: String(localized: "Unrecognized target layout", bundle: .scannerKit),
                 description: String(localized: "No recognized profile with a Cargo lock and a .fingerprint folder. Cleaning is disabled.", bundle: .scannerKit),
                 safety: .caution, sizeBytes: info.allocatedBytes, paths: [target]).measured(info)]

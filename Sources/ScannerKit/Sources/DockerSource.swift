@@ -42,17 +42,25 @@ enum DockerSource {
         var Shared: String?
     }
 
+    static func orbstackDisk(home: String) -> String { Paths.expand("~/Library/Group Containers/HUAQ24HBR6.dev.orbstack", home: home) }
+    static func dockerDesktopDisk(home: String) -> String { Paths.expand("~/Library/Containers/com.docker.docker", home: home) }
+
+    /// Storage Docker reports itself. Claimed before the slow CLI queries start, so the other sources
+    /// can run meanwhile without reporting it a second time.
+    static func reservedPaths(home: String) -> [String] {
+        [orbstackDisk(home: home), dockerDesktopDisk(home: home)].filter(Paths.exists)
+    }
+
     static func scan(_ ctx: ScanContext) async -> [ScanItem] {
-        let orbstackDisk = Paths.expand("~/Library/Group Containers/HUAQ24HBR6.dev.orbstack", home: ctx.options.home)
-        let dockerDesktopDisk = Paths.expand("~/Library/Containers/com.docker.docker", home: ctx.options.home)
+        let home = ctx.options.home
         var items: [ScanItem] = []
 
         for (path, title, app) in [
-            (orbstackDisk, String(localized: "OrbStack virtual machine disk image", bundle: .scannerKit), "OrbStack"),
-            (dockerDesktopDisk, String(localized: "Docker Desktop data", bundle: .scannerKit), "Docker Desktop"),
+            (orbstackDisk(home: home), String(localized: "OrbStack virtual machine disk image", bundle: .scannerKit), "OrbStack"),
+            (dockerDesktopDisk(home: home), String(localized: "Docker Desktop data", bundle: .scannerKit), "Docker Desktop"),
         ] where Paths.exists(path) {
             await ctx.claims.claimAll([path])
-            let info = SizeCalculator.measure(path)
+            let info = await ctx.measure(path)
             items.append(ScanItem(
                 id: "docker.vm-disk:\(path)", category: .docker, title: title, app: app,
                 description: String(localized: "A single disk image file that holds all containers, images, volumes and Linux machines. The items above are part of it. It is not removed as a file: removing images and volumes frees space inside it, and \(app) returns that space to macOS automatically.", bundle: .scannerKit),

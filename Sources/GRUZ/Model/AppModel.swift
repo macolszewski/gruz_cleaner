@@ -21,7 +21,13 @@ final class AppModel {
     private(set) var catalog: RuleCatalog?
     private(set) var catalogError: String?
 
-    private(set) var result: ScanResult?
+    private(set) var result: ScanResult? {
+        didSet {
+            resultVersion &+= 1
+            itemIndex = nil
+            visibleCache = nil
+        }
+    }
     private(set) var isScanning = false
     private(set) var activeStages: [ScanStage] = []
     private(set) var resultIsCached = false
@@ -43,6 +49,13 @@ final class AppModel {
     private(set) var isDemo = false
     private var scanTask: Task<Void, Never>?
     private var partialResult: ScanResult?
+
+    /// Derived from `result` and the filters; rebuilt only when they change, not on every view update.
+    @ObservationIgnored private var resultVersion = 0
+    @ObservationIgnored private var itemIndex: [String: ScanItem]?
+    @ObservationIgnored private var visibleCache: (key: VisibleKey, byCategory: [ScannerKit.Category: [ScanItem]])?
+    /// Reads and writes `last-scan.json` in order, away from the main thread.
+    @ObservationIgnored private let cacheQueue = DispatchQueue(label: "GRUZ last scan", qos: .utility)
 
     init() {
         do {
@@ -113,15 +126,17 @@ final class AppModel {
             })
             let historyDirectory = self.cacheURL.deletingLastPathComponent()
             let roots = options.projectRoots
-            let annotated = await Task.detached {
-                UsageHistoryStore.update(result, roots: roots, directory: historyDirectory)
+            let (annotated, index) = await Task.detached {
+                let annotated = UsageHistoryStore.update(result, roots: roots, directory: historyDirectory)
+                return (annotated, annotated.index)
             }.value
             self.result = annotated
+            self.itemIndex = index
+            self.partialResult = nil
             self.resultIsCached = false
             self.isScanning = false
             self.activeStages = []
             // Drop selections that no longer exist.
-            let index = result.index
             self.selection = self.selection.filter { index[$0] != nil }
             self.saveCachedResult(annotated)
         }
@@ -132,8 +147,36 @@ final class AppModel {
     /// Items of a category after applying age thresholds and search; groups keep only visible children.
     func visibleItems(in category: ScannerKit.Category) -> [ScanItem] {
         guard let result else { return [] }
+        // Reading the inputs here also registers them for observation when the cached answer is used.
+        let key = VisibleKey(
+            resultVersion: resultVersion, searchText: searchText, growthOnly: growthOnly,
+            ageFilterEnabled: settings.ageFilterEnabled, ageFilterDays: settings.ageFilterDays,
+            ruleAgeOverrides: settings.ruleAgeOverrides, hour: Int(Date().timeIntervalSince1970 / 3600)
+        )
+        if visibleCache?.key != key { visibleCache = (key, [:]) }
+        if let cached = visibleCache?.byCategory[category] { return cached }
         let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        return result.items(in: category).compactMap { filtered($0, query: query) }.sorted { growthOnly ? growthAmount($0) > growthAmount($1) : $0.sizeBytes > $1.sizeBytes }
+        let items = result.items(in: category).compactMap { filtered($0, query: query) }
+        let sorted: [ScanItem]
+        if growthOnly {
+            // Each item's growth sums its leaves; computing it once keeps the sort from repeating that.
+            sorted = items.map { ($0, growthAmount($0)) }.sorted { $0.1 > $1.1 }.map(\.0)
+        } else {
+            sorted = items.sorted { $0.sizeBytes > $1.sizeBytes }
+        }
+        visibleCache?.byCategory[category] = sorted
+        return sorted
+    }
+
+    private struct VisibleKey: Equatable {
+        var resultVersion: Int
+        var searchText: String
+        var growthOnly: Bool
+        var ageFilterEnabled: Bool
+        var ageFilterDays: Int
+        var ruleAgeOverrides: [String: Int]
+        /// Age thresholds compare with the current time, so the answer is also refreshed every hour.
+        var hour: Int
     }
 
     private func growthAmount(_ item: ScanItem) -> Int64 {
@@ -197,7 +240,8 @@ final class AppModel {
 
     func item(id: String?) -> ScanItem? {
         guard let id, let result else { return nil }
-        return result.index[id]
+        if itemIndex == nil { itemIndex = result.index }
+        return itemIndex?[id]
     }
 
     func selectionState(of item: ScanItem, visible: ScanItem) -> Bool? {
@@ -222,7 +266,11 @@ final class AppModel {
         ScannerKit.Category.allCases.flatMap { visibleItems(in: $0) }.flatMap(\.leaves).filter { selection.contains($0.id) }
     }
 
-    var selectedBytes: Int64 { selectedLeaves.reduce(0) { $0 + $1.sizeBytes } }
+    /// Count and size of the selection from one pass over the visible items.
+    var selectionSummary: (count: Int, bytes: Int64) {
+        let leaves = selectedLeaves
+        return (leaves.count, leaves.reduce(0) { $0 + $1.sizeBytes })
+    }
 
     func clearSelection() {
         selection.removeAll()
@@ -292,37 +340,48 @@ final class AppModel {
         URL(fileURLWithPath: Paths.home).appendingPathComponent("Library/Application Support/GRUZ/last-scan.json")
     }
 
+    /// Decodes the last result on the cache queue and shows it unless a scan has already replaced it.
     private func loadCachedResult() {
-        guard let data = try? Data(contentsOf: cacheURL) else { return }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        // Titles and descriptions are stored already resolved, so a scan made in another language is stale.
-        if let cached = try? decoder.decode(ScanResult.self, from: data), Self.matchesCurrentLanguage(cached) {
-            var safeCache = cached
+        let url = cacheURL
+        let rescanNote = String(localized: "Scan again to choose Rust profiles safely.")
+        cacheQueue.async {
+            guard let data = try? Data(contentsOf: url) else { return }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            // Titles and descriptions are stored already resolved, so a scan made in another language is stale.
+            guard var cached = try? decoder.decode(ScanResult.self, from: data), Self.matchesCurrentLanguage(cached) else { return }
             func disableLegacyRust(_ item: ScanItem) -> ScanItem {
                 var copy = item
                 copy.children = item.children.map(disableLegacyRust)
                 if item.ruleID == "artifact.rust-target", item.rustArtifact == nil {
                     copy.action = nil
-                    copy.note = String(localized: "Scan again to choose Rust profiles safely.")
+                    copy.note = rescanNote
                 }
                 return copy
             }
-            safeCache.items = cached.items.map(disableLegacyRust)
-            result = safeCache
-            resultIsCached = true
+            cached.items = cached.items.map(disableLegacyRust)
+            let loaded = cached
+            Task { @MainActor [weak self] in
+                guard let self, self.result == nil, !self.isScanning else { return }
+                self.result = loaded
+                self.resultIsCached = true
+            }
         }
     }
 
-    private static func matchesCurrentLanguage(_ result: ScanResult) -> Bool {
+    private nonisolated static func matchesCurrentLanguage(_ result: ScanResult) -> Bool {
         result.language == Localization.current
     }
 
+    /// Writes run in the order they were asked for, so an older result never replaces a newer one.
     private func saveCachedResult(_ result: ScanResult) {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(result) else { return }
-        try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: cacheURL, options: .atomic)
+        let url = cacheURL
+        cacheQueue.async {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            guard let data = try? encoder.encode(result) else { return }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+        }
     }
 }

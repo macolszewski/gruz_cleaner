@@ -28,8 +28,10 @@ public struct SizeInfo: Sendable, Equatable {
 
 /// Measures directory trees with `fts`, without following symlinks or crossing volumes.
 public enum SizeCalculator {
-    /// - Parameter excluding: absolute paths whose subtrees are skipped (already accounted elsewhere).
-    public static func measure(_ path: String, excluding: Set<String> = []) -> SizeInfo {
+    /// - Parameters:
+    ///   - excluding: absolute paths whose subtrees are skipped (already accounted elsewhere).
+    ///   - cancellation: polled instead of `Task.isCancelled` when the walk runs outside a task (`IOPool`).
+    public static func measure(_ path: String, excluding: Set<String> = [], cancellation: CancellationFlag? = nil) -> SizeInfo {
         var info = SizeInfo()
         var seenInodes = Set<UInt64>()
         var newest: time_t = 0
@@ -44,9 +46,13 @@ public enum SizeCalculator {
         defer { fts_close(fts) }
 
         var visited = 0
+        defer {
+            ScanMetrics.shared.add(.measurements)
+            ScanMetrics.shared.add(.measuredEntries, visited)
+        }
         while let entry = fts_read(fts) {
             visited += 1
-            if visited % 4096 == 0, Task.isCancelled { break }
+            if visited % 4096 == 0, cancellation?.isCancelled ?? Task.isCancelled { break }
             let info_ = Int32(entry.pointee.fts_info)
             switch info_ {
             case FTS_D:
@@ -84,11 +90,6 @@ public enum SizeCalculator {
         info.allocatedBytes += Int64(st.st_blocks) * 512
         if isFile { info.fileCount += 1 }
         if st.st_mtimespec.tv_sec > newest { newest = st.st_mtimespec.tv_sec }
-    }
-
-    /// Measures several roots concurrently.
-    public static func measureAll(_ paths: [String], excluding: Set<String> = []) async -> [String: SizeInfo] {
-        await concurrentMap(paths, width: max(2, ProcessInfo.processInfo.activeProcessorCount)) { measure($0, excluding: excluding) }
     }
 }
 

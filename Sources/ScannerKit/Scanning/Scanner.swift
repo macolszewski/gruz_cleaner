@@ -85,19 +85,24 @@ public struct Scanner: Sendable {
             denylist: Denylist(home: options.home, protectedRoots: options.projectRoots), warnings: WarningSink()
         )
 
+        ScanMetrics.shared.reset()
+
         func run(_ stage: ScanStage, _ body: @Sendable (ScanContext) async -> [ScanItem]) async -> [ScanItem] {
             onStage(stage, false)
+            let signposter = ScanMetrics.signposter
+            let interval = signposter.beginInterval("Scan stage", id: signposter.makeSignpostID(), "\(stage.rawValue, privacy: .public)")
             let items = await body(ctx)
+            signposter.endInterval("Scan stage", interval)
             onItems(items)
             onStage(stage, true)
             return items
         }
 
         // Docker and simulators claim their storage first so rules and orphans do not report it twice.
+        // Only the claims come first: the CLI queries can take minutes and run alongside the rules.
+        await ctx.claims.claimAll(DockerSource.reservedPaths(home: options.home) + SimulatorSource.reservedPaths(home: options.home))
         async let docker = run(.docker, DockerSource.scan)
         async let simulators = run(.simulators, SimulatorSource.scan)
-        let dockerItems = await docker
-        let simulatorItems = await simulators
         let ruleItems = await run(.rules, RuleSource.scan)
 
         async let projects = run(.projects, ProjectSource.scan)
@@ -105,6 +110,9 @@ public struct Scanner: Sendable {
         let projectItems = await projects
         let orphanItems = await run(.orphans, OrphanSource.scan)
         let applicationItems = await applications
+        // Unrecognized folders are what no other source describes, so every claim must be in.
+        let dockerItems = await docker
+        let simulatorItems = await simulators
         let unrecognizedItems = await run(.unrecognized, UnrecognizedSource.scan)
 
         let all = dockerItems + simulatorItems + ruleItems + projectItems + orphanItems + applicationItems + unrecognizedItems

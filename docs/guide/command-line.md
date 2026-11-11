@@ -22,6 +22,8 @@ swift run gruz-scan --root ~/code --root ~/work
 | `--children` | Show the items inside each group, indented. |
 | `--json` | Print the whole result as JSON instead of text. |
 | `--root <folder>` | A project folder to scan for artifacts and Rust targets. Repeatable. Without it, the default project folders are used (`~/Developer`, `~/workspace`, `~/Projects`, `~/code`, `~/src`, `~/dev`, `~/repos`, whichever exist). |
+| `--stats` | Print to standard error how much file system work the scan did: entries visited by project discovery and by measurements, measurements made and reused, directory listings made and reused, and the most folder walks that ran at once. Useful to compare two versions on the same data. |
+| `--fs-width <n>` | How many folder walks may run at the same time across the whole scan (default 8). |
 | `-h`, `--help` | Print the usage. |
 
 `gruz-scan` does not read the app's settings. It uses its own project folders (above) and the default

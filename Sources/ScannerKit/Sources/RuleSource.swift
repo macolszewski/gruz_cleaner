@@ -9,8 +9,8 @@ enum RuleSource {
         for rule in ctx.catalog.rules {
             var accepted: [String] = []
             var unreadable: [String] = []
-            for path in matches(for: rule, home: ctx.options.home, unreadable: &unreadable) {
-                if rule.action != nil, ctx.denylist.check(path) != .allowed { continue }
+            for path in matches(for: rule, home: ctx.options.home, unreadable: &unreadable, glob: ctx.cache.glob) {
+                if rule.action != nil, !ctx.isAllowed(path) { continue }
                 switch await ctx.claims.tryClaim(path) {
                 case .claimed:
                     accepted.append(path)
@@ -29,8 +29,14 @@ enum RuleSource {
             await ctx.warnings.addUnreadable(unreadable)
         }
 
-        var sizes = await SizeCalculator.measureAll(resolved.flatMap(\.1).filter { exclusions[$0] == nil })
-        for (path, excluded) in exclusions { sizes[path] = SizeCalculator.measure(path, excluding: excluded) }
+        let plain = resolved.flatMap(\.1).filter { exclusions[$0] == nil }
+        let sizes = await withTaskGroup(of: [String: SizeInfo].self) { group in
+            group.addTask { await ctx.measureAll(plain) }
+            for (path, excluded) in exclusions {
+                group.addTask { [path: await ctx.measure(path, excluding: excluded)] }
+            }
+            return await group.reduce(into: [:]) { $0.merge($1) { first, _ in first } }
+        }
         // An item measured at zero is left out; when that zero only means "could not read", say so.
         await ctx.warnings.addUnreadable(sizes.filter { $0.value.allocatedBytes == 0 && $0.value.isPartial }.map(\.key))
 
@@ -51,8 +57,11 @@ enum RuleSource {
         return matches(for: rule, home: home, unreadable: &unreadable)
     }
 
-    static func matches(for rule: Rule, home: String, unreadable: inout [String]) -> [String] {
-        let expansions = rule.paths.map { Paths.globReporting($0, home: home) }
+    static func matches(
+        for rule: Rule, home: String, unreadable: inout [String],
+        glob: (String, String) -> Paths.GlobResult = { Paths.globReporting($0, home: $1) }
+    ) -> [String] {
+        let expansions = rule.paths.map { glob($0, home) }
         unreadable += expansions.flatMap(\.unreadable)
         let bases = expansions.flatMap(\.matches)
         let filtered = bases.filter { path in

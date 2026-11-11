@@ -10,7 +10,7 @@ enum ApplicationsSource {
                 apps.append(Paths.join(root, entry))
             }
         }
-        let sizes = await SizeCalculator.measureAll(apps)
+        let sizes = await ctx.measureAll(apps)
         return apps.compactMap { path -> ScanItem? in
             guard let info = sizes[path], info.allocatedBytes > 0 else { return nil }
             return makeItem(path: path, bundleID: Bundle(path: path)?.bundleIdentifier, info: info)
@@ -36,7 +36,7 @@ enum UnrecognizedSource {
                           "~/Library/Group Containers", "~/.cache", "~/.local/share"].map { Paths.expand($0, home: h) }
         var candidates: [String] = []
         for dir in containers {
-            for entry in (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? [] {
+            for entry in ctx.cache.contents(of: dir) ?? [] {
                 if entry.hasPrefix("com.apple.") || entry.hasPrefix("group.com.apple.") { continue }
                 candidates.append(Paths.join(dir, entry))
             }
@@ -53,10 +53,12 @@ enum UnrecognizedSource {
         }
 
         let minimum = Int64(ctx.options.unrecognizedMinimumMB) * 1_000_000
+        // The threshold applies to the measured size, so every candidate is measured; leftovers checked
+        // earlier in the scan are not measured a second time.
         let results = await withTaskGroup(of: ScanItem?.self) { group in
             for (path, excluded) in work {
                 group.addTask {
-                    let info = SizeCalculator.measure(path, excluding: excluded)
+                    let info = await ctx.measure(path, excluding: excluded)
                     guard info.allocatedBytes >= minimum else { return nil }
                     return makeItem(path: path, info: info, excludesClaimedPaths: !excluded.isEmpty)
                 }

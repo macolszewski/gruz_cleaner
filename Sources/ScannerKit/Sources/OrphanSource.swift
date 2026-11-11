@@ -8,7 +8,7 @@ enum OrphanSource {
         var candidates: [String: [String]] = [:]
 
         for dir in config.searchDirs.map({ Paths.expand($0, home: ctx.options.home) }) {
-            guard let entries = try? FileManager.default.contentsOfDirectory(atPath: dir) else { continue }
+            guard let entries = ctx.cache.contents(of: dir) else { continue }
             for entry in entries {
                 let path = Paths.join(dir, entry)
                 guard Paths.isDirectory(path), let id = bundleID(fromFolderName: entry) else { continue }
@@ -20,7 +20,7 @@ enum OrphanSource {
         }
 
         // Measure first: the size filter is cheap compared with a Spotlight query per candidate.
-        let sizes = await SizeCalculator.measureAll(candidates.values.flatMap { $0 })
+        let sizes = await ctx.measureAll(candidates.values.flatMap { $0 })
         func size(of paths: [String]) -> SizeInfo { paths.reduce(into: SizeInfo()) { $0.merge(sizes[$1] ?? SizeInfo()) } }
         let minimum = Int64(config.minimumSizeMB) * 1_000_000
         let large = candidates.filter { size(of: $0.value).allocatedBytes >= minimum }
@@ -35,7 +35,7 @@ enum OrphanSource {
 
         var items: [ScanItem] = []
         for (id, paths) in large where lookups[id] == .notFound {
-            let allowed = paths.filter { ctx.denylist.check($0) == .allowed }
+            let allowed = paths.filter { ctx.isAllowed($0) }
             guard !allowed.isEmpty else { continue }
             await ctx.claims.claimAll(allowed)
             items.append(makeItem(id: id, paths: allowed, info: size(of: allowed)))

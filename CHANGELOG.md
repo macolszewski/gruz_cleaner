@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- A slow Docker or simulator query no longer holds back the rest of the scan: their storage is
+  claimed first and their CLI queries run alongside the rules, projects and leftovers.
+- Project folders are walked once for build artifacts and Cargo manifests together, with the same
+  results as the two separate walks before.
+- All folder walks of a scan share one limit on parallel work, outside Swift Concurrency's threads.
+- Directory listings, preserved-data patterns and measurements are shared within one scan, so
+  overlapping rules and leftover candidates no longer read the same folders again.
+- The Rust signature is computed while walking, in name order, instead of collecting and sorting a
+  text record of every entry. Selections kept from an earlier version need a new scan.
+- The app keeps its item index and filtered lists until the result or a filter changes, computes the
+  selection count and size in one pass, and reads and writes the last scan away from the main thread.
+- `gruz-scan --stats` prints counts of the file system work; `--fs-width` sets the limit on
+  parallel folder walks.
+
 ## [1.2.0]
 
 ### Changed

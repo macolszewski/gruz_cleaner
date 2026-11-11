@@ -66,6 +66,11 @@ public enum Paths {
 
     /// `glob` that also says where it could not look, so "nothing there" and "could not check" stay apart.
     public static func globReporting(_ pattern: String, home: String = Paths.home) -> GlobResult {
+        globReporting(pattern, home: home) { try? FileManager.default.contentsOfDirectory(atPath: $0) }
+    }
+
+    /// - Parameter list: names in a folder, or nil when it cannot be listed; a scan passes its shared listings.
+    static func globReporting(_ pattern: String, home: String, list: (String) -> [String]?) -> GlobResult {
         let expanded = expand(pattern, home: home)
         let components = expanded.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
         var result = GlobResult()
@@ -74,14 +79,13 @@ public enum Paths {
             var next: [String] = []
             for base in current {
                 if isGlob(component) {
-                    guard let entries = try? FileManager.default.contentsOfDirectory(atPath: base) else {
+                    guard let entries = list(base) else {
                         if isDirectory(base) { result.unreadable.append(base) }
                         continue
                     }
-                    for entry in entries.sorted() where fnmatch(component, entry) {
-                        if entry.hasPrefix(".") && !component.hasPrefix(".") { continue }
-                        next.append(join(base, entry))
-                    }
+                    // Only matches are sorted; most entries of a listed folder do not match.
+                    let matching = entries.filter { fnmatch(component, $0) && (!$0.hasPrefix(".") || component.hasPrefix(".")) }
+                    next += matching.sorted().map { join(base, $0) }
                 } else {
                     let candidate = join(base, component)
                     var st = stat()

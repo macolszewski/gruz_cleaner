@@ -15,8 +15,13 @@ enum SimulatorSource {
         var availabilityError: String?
     }
 
+    static func devicesDir(home: String) -> String { Paths.expand("~/Library/Developer/CoreSimulator/Devices", home: home) }
+
+    /// Claimed before `simctl` answers, so the other sources can run meanwhile.
+    static func reservedPaths(home: String) -> [String] { [devicesDir(home: home)].filter(Paths.isDirectory) }
+
     static func scan(_ ctx: ScanContext) async -> [ScanItem] {
-        let devicesDir = Paths.expand("~/Library/Developer/CoreSimulator/Devices", home: ctx.options.home)
+        let devicesDir = devicesDir(home: ctx.options.home)
         guard Paths.isDirectory(devicesDir) else { return [] }
         await ctx.claims.claimAll([devicesDir])
 
@@ -28,7 +33,7 @@ enum SimulatorSource {
         }
         let flat = list.devices.flatMap { runtime, devices in devices.map { (runtimeName(runtime), $0) } }
         let paths = flat.map { Paths.join(devicesDir, $0.1.udid) }
-        let sizes = await SizeCalculator.measureAll(paths)
+        let sizes = await ctx.measureAll(paths)
         let iso = ISO8601DateFormatter()
 
         let children = flat.compactMap { runtime, device -> ScanItem? in
