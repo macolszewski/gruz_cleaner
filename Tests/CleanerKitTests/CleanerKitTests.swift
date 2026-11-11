@@ -364,6 +364,12 @@ struct TestEnvironment {
         let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
         #expect(h.commands.calls == [["/fake/bin/docker", "--host", Self.host, "volume", "rm", "shop_db"]])
         #expect(report.doneCount == 1)
+        // An item saved by an earlier version asks for a new scan instead of naming the allow list.
+        guard case .skipped(let why) = report.results.first(where: { $0.id == "unpinned" })?.status else {
+            Issue.record("expected a skip")
+            return
+        }
+        #expect(why.contains("Scan again"))
     }
 
     @Test func commandsAreTreatedAsPermanent() async throws {

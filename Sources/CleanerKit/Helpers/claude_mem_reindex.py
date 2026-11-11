@@ -116,6 +116,32 @@ def documents(kind, row):
     return [(f"prompt_{identifier}", row.get("prompt_text") or "", metadata)]
 
 
+def default_client_factory(path):
+    import chromadb
+    from chromadb.config import Settings
+    return chromadb.PersistentClient(path=path, settings=Settings(anonymized_telemetry=False))
+
+
+def source_rows(db):
+    """(kind, row) for every source row, in index order. The caller holds one read transaction."""
+    for kind, query in INDEX_QUERIES.items():
+        for row in db.execute(query):
+            yield kind, row
+
+
+def add_watermark(watermarks, kind, row):
+    marks = watermarks.setdefault(row["project"] or "", {"observations": 0, "summaries": 0, "prompts": 0, "titleOnlyRequeued": True})
+    marks[kind] = max(marks[kind], row["id"])
+
+
+def open_snapshot(database):
+    db = sqlite3.connect(Path(database).resolve(strict=True).as_uri() + "?mode=ro", uri=True)
+    db.row_factory = sqlite3.Row
+    # One read transaction, so every pass sees the same snapshot.
+    db.execute("BEGIN")
+    return closing(db)
+
+
 def rebuild(database, output, client_factory=None):
     """Build a new index in `output`, which must not exist yet; `client_factory` is replaced in tests."""
     database = Path(database).resolve(strict=True)
@@ -123,11 +149,7 @@ def rebuild(database, output, client_factory=None):
     if output.exists() or output.is_symlink():
         raise ValueError("Destination already exists; refusing to overwrite an index")
     output.mkdir(mode=0o700, parents=False)
-    if client_factory is None:
-        import chromadb
-        from chromadb.config import Settings
-        client_factory = lambda path: chromadb.PersistentClient(path=path, settings=Settings(anonymized_telemetry=False))
-    client = client_factory(str(output))
+    client = (client_factory or default_client_factory)(str(output))
     collection = client.create_collection("cm__claude-mem")
     watermarks = {}
     expected_ids = set()
@@ -146,24 +168,18 @@ def rebuild(database, output, client_factory=None):
         temporary.replace(output / "cleaner-progress.json")
         batch.clear()
 
-    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as db:
-        db.row_factory = sqlite3.Row
-        # One read transaction, so counting and indexing see the same snapshot.
-        db.execute("BEGIN")
-        total = sum(len(documents(kind, row)) for kind, query in INDEX_QUERIES.items() for row in db.execute(query))
-        for kind, query in INDEX_QUERIES.items():
-            for row in db.execute(query):
-                project = row["project"] or ""
-                marks = watermarks.setdefault(project, {"observations": 0, "summaries": 0, "prompts": 0, "titleOnlyRequeued": True})
-                marks[kind] = max(marks[kind], row["id"])
-                for doc in documents(kind, row):
-                    if doc[0] in expected_ids:
-                        raise ValueError("Duplicate document ID; database session relationships are ambiguous")
-                    expected_ids.add(doc[0])
-                    batch.append(doc)
-                    if len(batch) >= 128:
-                        flush()
-            flush()
+    with open_snapshot(database) as db:
+        total = sum(len(documents(kind, row)) for kind, row in source_rows(db))
+        for kind, row in source_rows(db):
+            add_watermark(watermarks, kind, row)
+            for doc in documents(kind, row):
+                if doc[0] in expected_ids:
+                    raise ValueError("Duplicate document ID; database session relationships are ambiguous")
+                expected_ids.add(doc[0])
+                batch.append(doc)
+                if len(batch) >= 128:
+                    flush()
+        flush()
     if collection.count() != len(expected_ids):
         raise ValueError("Chroma document count does not match SQLite")
     actual_ids = set()
@@ -181,17 +197,13 @@ def source_snapshot(database):
     """Documents and watermarks the database holds now, read in one transaction."""
     expected = {}
     watermarks = {}
-    with closing(sqlite3.connect(Path(database).resolve(strict=True).as_uri() + "?mode=ro", uri=True)) as db:
-        db.row_factory = sqlite3.Row
-        db.execute("BEGIN")
-        for kind, query in INDEX_QUERIES.items():
-            for row in db.execute(query):
-                marks = watermarks.setdefault(row["project"] or "", {"observations": 0, "summaries": 0, "prompts": 0, "titleOnlyRequeued": True})
-                marks[kind] = max(marks[kind], row["id"])
-                for identifier, document, metadata in documents(kind, row):
-                    if identifier in expected:
-                        raise ValueError("Duplicate source document ID")
-                    expected[identifier] = (document, metadata)
+    with open_snapshot(database) as db:
+        for kind, row in source_rows(db):
+            add_watermark(watermarks, kind, row)
+            for identifier, document, metadata in documents(kind, row):
+                if identifier in expected:
+                    raise ValueError("Duplicate source document ID")
+                expected[identifier] = (document, metadata)
     return expected, watermarks
 
 
@@ -206,11 +218,7 @@ def verify_index(database, output, client_factory=None):
     expected, watermarks = source_snapshot(database)
     if json.loads((output / "cleaner-watermarks.json").read_text()) != watermarks:
         raise ValueError("Staging watermarks no longer match the database")
-    if client_factory is None:
-        import chromadb
-        from chromadb.config import Settings
-        client_factory = lambda path: chromadb.PersistentClient(path=path, settings=Settings(anonymized_telemetry=False))
-    client = client_factory(str(output))
+    client = (client_factory or default_client_factory)(str(output))
     collection = client.get_collection("cm__claude-mem")
     if collection.count() != len(expected):
         raise ValueError("Staging index is incomplete")

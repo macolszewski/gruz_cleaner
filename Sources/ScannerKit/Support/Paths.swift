@@ -144,6 +144,11 @@ public enum Paths {
         return lstat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFDIR
     }
 
+    public static func isRegularFile(_ path: String) -> Bool {
+        var st = stat()
+        return lstat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG
+    }
+
     public static func isSymlink(_ path: String) -> Bool {
         var st = stat()
         return lstat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFLNK

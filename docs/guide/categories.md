@@ -100,7 +100,8 @@ Most project items are **Regenerable** and move to the Trash. Test results are *
 the tests again does not bring back the trace or video of an earlier failure. Agent worktrees are
 **Caution**, because a worktree may hold uncommitted work: the item note shows a `git status` summary.
 Worktrees that Codex (`~/.codex/worktrees`) and Cursor (`~/.cursor/worktrees`) keep outside your
-project folders are listed here too, each with its Git status. The project
+project folders are listed here too, each with its Git status. Only linked worktrees count: a full
+clone in those folders keeps its own history and unpushed commits, so it is never listed. The project
 folders themselves and your source code are protected and can never be removed. Rust `target`
 folders are listed in Rust and Cargo instead.
 

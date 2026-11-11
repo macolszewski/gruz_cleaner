@@ -504,12 +504,16 @@ struct Fixture {
             catalog: try RuleCatalog.builtIn(), options: ScanOptions(projectRoots: [fx.path("ws")], home: fx.path("home")),
             claims: ClaimRegistry(), denylist: Denylist(home: fx.root), warnings: WarningSink()
         )
-        let leaves = await ProjectSource.scan(ctx).flatMap(\.leaves)
+        let items = await ProjectSource.scan(ctx)
+        let leaves = items.flatMap(\.leaves)
         let pkg = try #require(leaves.first { $0.paths == [fx.path("ws/pkg/build")] })
         #expect(pkg.safety == .caution)
         #expect(!leaves.contains { $0.paths == [fx.path("ws/repo/build")] })
         let cpp = try #require(leaves.first { $0.paths == [fx.path("ws/cpp/build")] })
         #expect(cpp.safety == .regenerable)
+        // The group header is as cautious as its most cautious item.
+        let group = try #require(items.first { $0.children.contains { $0.paths == [fx.path("ws/pkg/build")] } })
+        #expect(group.safety == .caution)
     }
 
     @Test func testResultsNeedTheirTestRunner() throws {
@@ -558,6 +562,11 @@ struct Fixture {
         // Directory.Build.props without the artifacts layout.
         try fx.file("ws/plain/Directory.Build.props", contents: "<Project></Project>")
         try fx.file("ws/plain/artifacts/bin/tool")
+        // The layout switched off or only mentioned in a comment.
+        try fx.file("ws/off/Directory.Build.props", contents: "<Project><UseArtifactsOutput>false</UseArtifactsOutput></Project>")
+        try fx.file("ws/off/artifacts/bin/tool")
+        try fx.file("ws/commented/Directory.Build.props", contents: "<Project><!-- <UseArtifactsOutput>true</UseArtifactsOutput> --></Project>")
+        try fx.file("ws/commented/artifacts/bin/tool")
 
         let catalog = try RuleCatalog.builtIn()
         let found = ProjectSource.findArtifacts(in: fx.path("ws"), definitions: catalog.artifacts, home: "/nonexistent")
@@ -570,6 +579,8 @@ struct Fixture {
         #expect(ids[fx.path("ws/sln/artifacts/obj")] == "artifact.dotnet-artifacts")
         #expect(!ids.keys.contains { $0.contains("publish") || $0.contains("package") })
         #expect(ids[fx.path("ws/plain/artifacts/bin")] == nil)
+        #expect(ids[fx.path("ws/off/artifacts/bin")] == nil)
+        #expect(ids[fx.path("ws/commented/artifacts/bin")] == nil)
 
         let definition = try #require(catalog.artifacts.first { $0.id == "artifact.nx-cache" })
         let item = ProjectSource.makeItem(definition, path: fx.path("ws/mono/.nx/cache"), root: fx.path("ws"), info: SizeInfo(allocatedBytes: 1), note: nil)
@@ -620,6 +631,8 @@ struct Fixture {
         try fx.file("home/.codex/worktrees/a1b2/shop/src/main.ts")
         try fx.file("home/.codex/worktrees/a1b2/notes/todo.md")
         try fx.file("home/.cursor/worktrees/api/feature/.git", contents: "gitdir: x")
+        // A full clone has its own history and unpushed commits; it is not a disposable worktree.
+        try fx.file("home/.cursor/worktrees/api/clone/.git/HEAD", contents: "ref: refs/heads/main")
         let catalog = try RuleCatalog.builtIn()
         let codex = try #require(catalog.rules.first { $0.id == "codex.worktrees" })
         let cursor = try #require(catalog.rules.first { $0.id == "cursor.worktrees" })
@@ -646,17 +659,21 @@ struct Fixture {
         try git("add", ".")
         try git("commit", "-qm", "init")
         try git("config", "filter.mark.clean", "touch '\(marker)'; cat")
+        // As `git lfs install` does: a filter that must not fail.
+        try git("config", "filter.mark.required", "true")
         // An older modification time makes Git re-read the file through its filter.
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 0)], ofItemAtPath: fx.path("repo/f.txt"))
-        _ = await ProjectSource.gitStatusNote(fx.path("repo"))
+        let note = await ProjectSource.gitStatusNote(fx.path("repo"))
         #expect(!FileManager.default.fileExists(atPath: marker))
+        #expect(note != String(localized: "Could not check the Git status", bundle: .scannerKit))
     }
 
     @Test func filterNamesComeFromConfigKeys() {
         let config = "filter.lfs.clean git-lfs clean -- %f\nfilter.lfs.process git-lfs filter-process\nfilter.a.b.smudge cat\nfilter.x\n"
         #expect(GitInspection.filterNames(fromConfig: config) == ["a.b", "lfs"])
         let env = GitInspection.environment(disablingFilters: ["lfs"])
-        #expect(env["GIT_CONFIG_COUNT"] == "3")
+        #expect(env["GIT_CONFIG_COUNT"] == "4")
+        #expect(env["GIT_CONFIG_KEY_3"] == "filter.lfs.required" && env["GIT_CONFIG_VALUE_3"] == "false")
         #expect(env["GIT_CONFIG_KEY_0"] == "filter.lfs.clean" && env["GIT_CONFIG_VALUE_0"] == "")
         #expect(GitInspection.environment(disablingFilters: []).isEmpty)
     }

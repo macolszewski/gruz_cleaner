@@ -40,9 +40,10 @@ enum ProjectSource {
             }
         }
 
+        let allowed = leaves.filter { ctx.denylist.check($0.path) == .allowed }
+        let tracked = await concurrentMap(allowed.filter(\.definition.rejectGitTracked).map(\.path), width: 4) { await hasGitTrackedFiles($0) }
         var accepted: [Found] = []
-        for leaf in leaves where ctx.denylist.check(leaf.path) == .allowed {
-            if leaf.definition.rejectGitTracked, await hasGitTrackedFiles(leaf.path) { continue }
+        for leaf in allowed where tracked[leaf.path] != true {
             if await ctx.claims.claim(leaf.path) { accepted.append(leaf) }
         }
         let sizes = await SizeCalculator.measureAll(accepted.filter { $0.definition.id != "artifact.rust-target" }.map(\.path))
@@ -90,7 +91,8 @@ enum ProjectSource {
         return ScanItem(
             id: definition.id, ruleID: definition.id, category: .projects,
             title: "\(definition.title) (\(children.count))", description: definition.description,
-            regeneration: definition.regeneration, safety: definition.safety,
+            // The header must not look safer than any item inside it.
+            regeneration: definition.regeneration, safety: children.map(\.safety).max() ?? definition.safety,
             sizeBytes: children.reduce(0) { $0 + $1.sizeBytes }, lastModified: children.compactMap(\.lastModified).max(),
             children: children
         )
@@ -177,8 +179,10 @@ enum ProjectSource {
         guard let handle = FileHandle(forReadingAtPath: path) else { return false }
         defer { try? handle.close() }
         guard let data = try? handle.read(upToCount: 1 << 20) else { return false }
+        // A commented-out setting (`<!-- <UseArtifactsOutput>true</UseArtifactsOutput> -->`) is not a setting.
         let text = String(decoding: data, as: UTF8.self)
-        return needles.contains { text.contains($0) }
+            .replacingOccurrences(of: "<!--[\\s\\S]*?-->", with: "", options: .regularExpression)
+        return needles.contains { text.range(of: $0, options: .caseInsensitive) != nil }
     }
 
     /// True when `definition` names tool-specific entries and none of them is inside `path`.

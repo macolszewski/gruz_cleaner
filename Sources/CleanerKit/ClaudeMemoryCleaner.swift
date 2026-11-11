@@ -175,13 +175,15 @@ public actor ClaudeMemoryCleaner {
                     }
                 }
                 let staging = reusable ?? location.root.appendingPathComponent(".cleaner-chroma-\(UUID().uuidString)")
+                try await runtime.checkStopped(location: location)
                 if reusable == nil {
                     try await runtime.rebuildIndex(location: location, destination: staging, progress: progress)
+                    try await runtime.checkStopped(location: location)
+                    // The rebuild read one snapshot; the index is checked against the database as it is now, right
+                    // before it is installed, and the helper refuses it when the database changes while it compares.
+                    // A reused index was verified the same way just above.
+                    try await runtime.verifyIndex(location: location, destination: staging)
                 }
-                try await runtime.checkStopped(location: location)
-                // The rebuild read one snapshot; the index is checked against the database as it is now, right
-                // before it is installed, and the helper refuses it when the database changes while it compares.
-                try await runtime.verifyIndex(location: location, destination: staging)
                 try installIndex(staging, location: location, backup: backup)
             }
             report.indexRebuilt = true

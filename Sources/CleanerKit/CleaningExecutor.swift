@@ -233,7 +233,10 @@ public struct CleaningExecutor: Sendable {
                 }
             }
         case .command(let argv):
-            if !CommandPolicy.isAllowedCleanCommand(argv) {
+            if argv.first == "docker", argv.dropFirst().first != "--host" {
+                // Saved by an earlier version, before Docker commands named their engine.
+                problems.append(LocalizedMessage("This item comes from an older scan. Scan again."))
+            } else if !CommandPolicy.isAllowedCleanCommand(argv) {
                 problems.append(LocalizedMessage("The command is not on the allow list"))
             } else if commands.locate(argv[0]) == nil {
                 problems.append(LocalizedMessage("Cannot find \(argv[0])"))

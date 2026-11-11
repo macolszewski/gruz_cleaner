@@ -123,7 +123,7 @@ private final class ProcessGroup: @unchecked Sendable {
     func stop() {
         let signalled: Bool = lock.withLock {
             requested = true
-            guard !stopped, !reaped else { return false }
+            guard !stopped, !reaped, !leaderExited() else { return false }
             stopped = true
             killpg(pid, SIGTERM)
             return true
@@ -132,6 +132,13 @@ private final class ProcessGroup: @unchecked Sendable {
         DispatchQueue.global().asyncAfter(deadline: .now() + 3) { [self] in
             lock.withLock { if !reaped { _ = killpg(pid, SIGKILL) } }
         }
+    }
+
+    /// True once the leader has exited, even if it is not reaped yet: a program that finished on its own
+    /// must not be reported as stopped because a deadline passed a moment later.
+    private func leaderExited() -> Bool {
+        var info = siginfo_t()
+        return waitid(P_PID, id_t(pid), &info, WEXITED | WNOWAIT | WNOHANG) == 0 && info.si_pid == pid
     }
 
     /// Blocks until the leader exits, ends the helpers it left in the group, then reaps it.

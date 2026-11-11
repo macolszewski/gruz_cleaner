@@ -81,14 +81,18 @@ public enum GitInspection {
     }
 
     /// Configuration passed through the environment (`GIT_CONFIG_COUNT`, Git 2.31+) that empties every
-    /// command of the named filters: Git runs no filter whose command is empty.
+    /// command of the named filters: Git runs no filter whose command is empty. `required` is turned off
+    /// too, or Git treats the missing filter as a failure (`git lfs install` sets it for LFS).
     public static func environment(disablingFilters names: [String]) -> [String: String] {
-        let keys = names.flatMap { name in ["clean", "smudge", "process"].map { "filter.\(name).\($0)" } }
-        var env = ["GIT_CONFIG_COUNT": String(keys.count)]
-        for (index, key) in keys.enumerated() {
-            env["GIT_CONFIG_KEY_\(index)"] = key
-            env["GIT_CONFIG_VALUE_\(index)"] = ""
+        let pairs = names.flatMap { name in
+            ["clean", "smudge", "process"].map { ("filter.\(name).\($0)", "") } + [("filter.\(name).required", "false")]
         }
-        return keys.isEmpty ? [:] : env
+        guard !pairs.isEmpty else { return [:] }
+        var env = ["GIT_CONFIG_COUNT": String(pairs.count)]
+        for (index, pair) in pairs.enumerated() {
+            env["GIT_CONFIG_KEY_\(index)"] = pair.0
+            env["GIT_CONFIG_VALUE_\(index)"] = pair.1
+        }
+        return env
     }
 }

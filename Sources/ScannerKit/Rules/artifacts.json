@@ -342,9 +342,10 @@
       "Directory.Build.props"
     ],
     "parentSiblingContainsAny": [
-      "UseArtifactsOutput",
-      "ArtifactsPath"
+      "<UseArtifactsOutput>true</UseArtifactsOutput>",
+      "<ArtifactsPath>"
     ],
+    "rejectGitTracked": true,
     "title": ".NET central build output (artifacts/bin, obj)",
     "description": "Compiled libraries and intermediate files of a .NET solution that uses the central artifacts layout (UseArtifactsOutput). Published apps and packages in artifacts/publish and artifacts/package are not included.",
     "regeneration": "dotnet build.",

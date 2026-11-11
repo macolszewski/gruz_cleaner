@@ -57,7 +57,9 @@ enum RuleSource {
         let bases = expansions.flatMap(\.matches)
         let filtered = bases.filter { path in
             let name = (path as NSString).lastPathComponent
-            if rule.gitStatusCheck, !Paths.exists(Paths.join(path, ".git")) { return false }
+            // Only linked worktrees (`.git` is a file pointing at the main repository): a full clone keeps its
+            // own history, stashes and unpushed commits, which `git status` does not show.
+            if rule.gitStatusCheck, !Paths.isRegularFile(Paths.join(path, ".git")) { return false }
             return !rule.excludeNames.contains { Paths.fnmatch($0, name) }
         }
         switch rule.kind {

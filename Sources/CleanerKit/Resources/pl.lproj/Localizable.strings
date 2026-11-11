@@ -84,3 +84,4 @@
 "The index does not match the database: %@" = "Indeks nie odpowiada bazie: %@";
 "Stopped because the operation log cannot be written: %@" = "Wstrzymano, bo nie da się zapisać dziennika operacji: %@";
 "The folder was replaced by a link or a file, or it no longer exists. Scan again." = "Folder został zastąpiony dowiązaniem lub plikiem albo już nie istnieje. Zeskanuj ponownie.";
+"This item comes from an older scan. Scan again." = "Ta pozycja pochodzi ze starszego skanu. Zeskanuj ponownie.";
