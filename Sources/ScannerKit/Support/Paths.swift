@@ -50,38 +50,65 @@ public enum Paths {
     /// Expands a path pattern whose components may contain globs. Hidden entries match only patterns
     /// that start with a dot. Results are sorted.
     ///
-    /// Below the home folder (or the temporary folder) a match is dropped when one of its ancestors is a
-    /// symbolic link: `~/.npm/_npx -> ~/code/app/src` must not turn source files into "npx cache".
-    /// The match itself may be a link; removing a link never touches its target.
+    /// Below a removal root (home, the temporary folders, the Android SDK) a match is dropped when one of
+    /// its ancestors is a symbolic link: `~/.npm/_npx -> ~/code/app/src` must not turn source files into
+    /// "npx cache". The match itself may be a link; moving a link to the Trash never touches its target,
+    /// but a command that cleans a folder follows it, so `CleaningExecutor` refuses that case.
     public static func glob(_ pattern: String, home: String = Paths.home) -> [String] {
+        globReporting(pattern, home: home).matches
+    }
+
+    public struct GlobResult: Sendable {
+        public var matches: [String] = []
+        /// Folders the expansion could not look into (no permission, I/O error), so matches may be missing.
+        public var unreadable: [String] = []
+    }
+
+    /// `glob` that also says where it could not look, so "nothing there" and "could not check" stay apart.
+    public static func globReporting(_ pattern: String, home: String = Paths.home) -> GlobResult {
         let expanded = expand(pattern, home: home)
         let components = expanded.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        var result = GlobResult()
         var current = ["/"]
         for component in components {
             var next: [String] = []
             for base in current {
                 if isGlob(component) {
-                    guard let entries = try? FileManager.default.contentsOfDirectory(atPath: base) else { continue }
+                    guard let entries = try? FileManager.default.contentsOfDirectory(atPath: base) else {
+                        if isDirectory(base) { result.unreadable.append(base) }
+                        continue
+                    }
                     for entry in entries.sorted() where fnmatch(component, entry) {
                         if entry.hasPrefix(".") && !component.hasPrefix(".") { continue }
                         next.append(join(base, entry))
                     }
                 } else {
                     let candidate = join(base, component)
-                    if exists(candidate) { next.append(candidate) }
+                    var st = stat()
+                    if lstat(candidate, &st) == 0 {
+                        next.append(candidate)
+                    } else if errno != ENOENT && errno != ENOTDIR {
+                        result.unreadable.append(base)
+                    }
                 }
             }
             current = next
             if current.isEmpty { break }
         }
-        guard !components.isEmpty else { return [] }
-        return current.filter { !hasSymlinkedAncestor($0, home: home) }
+        guard !components.isEmpty else { return result }
+        result.matches = current.filter { !hasSymlinkedAncestor($0, home: home) }
+        return result
     }
 
-    /// The folder below which every path component must be a real directory: the home folder, the
-    /// user's temporary folder, or nil for other locations. Symlinks above it (such as `/var`) are system ones.
-    private static func trustedAnchor(of path: String, home: String) -> String? {
-        [home, userTempDir, "/private" + userTempDir].first { path != $0 && isWithin(path, $0) }
+    /// Folders under which removal may happen at all (see `Denylist`).
+    public static func removalRoots(home: String) -> [String] {
+        [home, "/private/var/folders", "/var/folders", "/opt/homebrew/share/android-commandlinetools"]
+    }
+
+    /// The folder below which every path component must be a real directory: the deepest removal root
+    /// that contains `path`, or nil for other locations. Symlinks above it (such as `/var`) are system ones.
+    static func trustedAnchor(of path: String, home: String) -> String? {
+        removalRoots(home: home).filter { path != $0 && isWithin(path, $0) }.max { $0.count < $1.count }
     }
 
     /// True when a component between the trusted anchor and `path` (exclusive) is a symbolic link.

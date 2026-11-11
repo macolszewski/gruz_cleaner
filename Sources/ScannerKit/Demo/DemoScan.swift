@@ -59,7 +59,7 @@ public enum DemoScan {
              "BuildCache":[{"InUse":"false","Shared":"false","Size":"3.42GB"}]}
             """
             guard let df = try? JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8)) else { return [] }
-            return DockerSource.parse(df, engine: "demo")
+            return DockerSource.parse(df, engine: .init(host: "unix:///var/run/docker.sock", identity: "demo"))
         }
 
         func rules() -> [ScanItem] {

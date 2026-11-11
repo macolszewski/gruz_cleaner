@@ -55,8 +55,9 @@ space after a removal. The item sizes are still estimates of what removal frees:
   still uses.
 - **App leftovers need Spotlight.** When Spotlight does not answer, possible leftovers are not shown
   at all and the scan says how many were skipped.
-- **Agent worktree status** comes from `git status`. GRUZ disables the fsmonitor hook and optional
-  locks, but Git may still run clean filters configured for the repository (Git LFS, for example).
+- **Agent worktree status** comes from `git status`. GRUZ disables the fsmonitor hook, optional locks
+  and every filter the repository configures (Git LFS, for example), so Git starts none of them. A file
+  whose filter would hide a difference can then show as changed, which errs on the side of keeping it.
 - **Age** is the newest modification time inside an item. A folder that is read often but never
   written can look old.
 

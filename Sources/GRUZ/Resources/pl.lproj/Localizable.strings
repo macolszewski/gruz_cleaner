@@ -90,7 +90,7 @@
 "Maintenance did not finish" = "Konserwacja nie została ukończona";
 "Maintenance finished" = "Konserwacja zakończona";
 "Maintenance Results" = "Wynik konserwacji";
-"Messages in queue: %lld. Cleanup becomes available once the queue is empty." = "W kolejce: %lld. Czyszczenie będzie możliwe po jej opróżnieniu.";
+"Queue entries left by an earlier claude-mem version: %lld. The worker no longer processes them, so they do not block maintenance and GRUZ leaves them as they are." = "Wpisy kolejki pozostawione przez wcześniejszą wersję claude-mem: %lld. Worker już ich nie przetwarza, więc nie blokują konserwacji, a GRUZ ich nie rusza.";
 "Move to Trash" = "Przenieś do Kosza";
 "Move to Trash (%@), can be undone" = "Do Kosza (%@), można cofnąć";
 "Moves to the Trash. You can undo this until you empty the Trash." = "Przeniesie do Kosza. Możesz to cofnąć, dopóki nie opróżnisz Kosza.";

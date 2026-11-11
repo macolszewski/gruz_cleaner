@@ -64,8 +64,10 @@ struct ClaudeMemoryView: View {
                                 .font(.caption)
                         }
                         if preview.pendingMessages > 0 {
-                            Label("Messages in queue: \(preview.pendingMessages). Cleanup becomes available once the queue is empty.", systemImage: "clock")
-                                .foregroundStyle(.orange)
+                            // Current workers keep their queue in memory; the table only holds rows an earlier version left.
+                            Label("Queue entries left by an earlier claude-mem version: \(preview.pendingMessages). The worker no longer processes them, so they do not block maintenance and GRUZ leaves them as they are.", systemImage: "tray")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         if memory.maintenanceActive {
                             Label("Another GRUZ instance is running maintenance. Wait for it to finish, then refresh the preview.", systemImage: "clock")
@@ -89,10 +91,10 @@ struct ClaudeMemoryView: View {
                 if memory.isLoading { ProgressView().controlSize(.small) }
                 Spacer()
                 Button("Rebuild Indexes…") { memory.review(rebuildOnly: true) }
-                    .disabled(!memory.isCurrent || memory.isLoading || memory.isRunning || memory.preview?.pendingMessages != 0 || memory.maintenanceActive)
+                    .disabled(!memory.isCurrent || memory.isLoading || memory.isRunning || memory.maintenanceActive)
                 Button("Review and Delete…") { memory.review(rebuildOnly: false) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!memory.isCurrent || memory.isLoading || memory.isRunning || memory.preview?.count == 0 || memory.preview?.pendingMessages != 0 || memory.interrupted)
+                    .disabled(!memory.isCurrent || memory.isLoading || memory.isRunning || memory.preview?.count == 0 || memory.interrupted)
             }
             .padding(16)
         }

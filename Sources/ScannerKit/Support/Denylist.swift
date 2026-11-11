@@ -36,7 +36,7 @@ public struct Denylist: Sendable {
             "\(h)/Library/Mail", "\(h)/Library/Messages", "\(h)/Library/Photos",
             "\(h)/.ssh", "\(h)/.gnupg", "\(h)/Documents", "\(h)/Desktop", "\(h)/Pictures",
         ]
-        allowedRoots = [h, "/private/var/folders", "/var/folders", "/opt/homebrew/share/android-commandlinetools"]
+        allowedRoots = Paths.removalRoots(home: h)
         preserved = Self.preservedPatterns.map { pattern in
             let expanded = Paths.expand(pattern, home: h)
             let fixed = expanded.prefix { $0 != "*" && $0 != "?" && $0 != "[" }
@@ -56,11 +56,21 @@ public struct Denylist: Sendable {
         "~/.cache/huggingface/stored_tokens",
     ]
 
-    private func preservedLocation(insideOrAbove path: String) -> String? {
+    private enum Preserved {
+        case found(String)
+        /// A folder that could hold preserved data cannot be read, so its absence is not proven.
+        case unknown(String)
+    }
+
+    private func preservedLocation(insideOrAbove path: String) -> Preserved? {
         // Cheap prefix test first: only patterns that share the fixed part of the path need a file system check.
         for (pattern, fixedDir) in preserved where Paths.isWithin(path, fixedDir) || Paths.isWithin(fixedDir, path) {
-            if let hit = Paths.glob(pattern, home: home).first(where: { Paths.isWithin(path, $0) || Paths.isWithin($0, path) }) {
-                return hit
+            let result = Paths.globReporting(pattern, home: home)
+            if let hit = result.matches.first(where: { Paths.isWithin(path, $0) || Paths.isWithin($0, path) }) {
+                return .found(hit)
+            }
+            if let blind = result.unreadable.first(where: { Paths.isWithin($0, path) || Paths.isWithin(path, $0) }) {
+                return .unknown(blind)
             }
         }
         return nil
@@ -90,8 +100,13 @@ public struct Denylist: Sendable {
         if Paths.hasSymlinkedAncestor(path, home: home) {
             return .denied(String(localized: "A folder in the path is a symbolic link", bundle: .scannerKit))
         }
-        if let kept = preservedLocation(insideOrAbove: path) {
+        switch preservedLocation(insideOrAbove: path) {
+        case .found(let kept):
             return .denied(String(localized: "Contains data that cannot be recreated: \(Paths.abbreviate(kept))", bundle: .scannerKit))
+        case .unknown(let blind):
+            return .denied(String(localized: "Cannot check whether it holds data that cannot be recreated: \(Paths.abbreviate(blind)) is not readable", bundle: .scannerKit))
+        case nil:
+            break
         }
         // Resolve symlinks in parent components so a link cannot redirect removal elsewhere.
         let parent = (path as NSString).deletingLastPathComponent

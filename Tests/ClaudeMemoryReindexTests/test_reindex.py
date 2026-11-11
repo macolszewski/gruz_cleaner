@@ -121,6 +121,35 @@ class ReindexTests(unittest.TestCase):
                 reindex.rebuild(root / "memory.db", root / "new", lambda _: Client(Broken()))
             self.assertFalse((root / "new/cleaner-watermarks.json").exists())
 
+    def test_write_during_verification_is_not_accepted(self):
+        class Stored(Collection):
+            def get(self, limit, offset, include):
+                ids = sorted(self.docs)[offset:offset + limit]
+                return {"ids": ids, "documents": [self.docs[i][0] for i in ids], "metadatas": [self.docs[i][1] for i in ids]}
+
+        class Verifying(Client):
+            def get_collection(self, name):
+                assert name == "cm__claude-mem"
+                return self.collection
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture(root / "memory.db")
+            collection = Stored()
+            reindex.rebuild(root / "memory.db", root / "new", lambda _: Client(collection))
+            (root / "new/chroma.sqlite3").touch()
+            reindex.verify_index(root / "memory.db", root / "new", lambda _: Verifying(collection))
+
+            def writing(_):
+                # Another process writes after the database was read and before the comparison ends.
+                with closing(sqlite3.connect(root / "memory.db")) as db:
+                    db.execute("UPDATE observations SET narrative='Changed during verification' WHERE id=1")
+                    db.commit()
+                return Verifying(collection)
+
+            with self.assertRaisesRegex(ValueError, "changed during verification"):
+                reindex.verify_index(root / "memory.db", root / "new", writing)
+
     @unittest.skipUnless(os.getenv("CLEANER_TEST_CHROMA") == "1", "optional real Chroma integration")
     def test_real_chroma_rebuild_and_query(self):
         import chromadb

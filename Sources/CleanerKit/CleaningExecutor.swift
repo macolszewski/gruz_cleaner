@@ -101,6 +101,8 @@ public struct OperationResult: Identifiable, Sendable {
     public var output: String?
     /// Paths of the operation that are still on disk after a partial removal.
     public var remainingPaths: [String] = []
+    /// Why the operation log could not record this operation; the executor stops the rest of the plan.
+    var logFailure: String?
 
     public init(operation: CleaningOperation, status: Status, output: String? = nil, remainingPaths: [String] = []) {
         self.operation = operation
@@ -236,10 +238,14 @@ public struct CleaningExecutor: Sendable {
             } else if commands.locate(argv[0]) == nil {
                 problems.append(LocalizedMessage("Cannot find \(argv[0])"))
             }
-            // A command that acts on a folder (uv cache clean --cache-dir) is held to the same rules as removing it.
+            // A command that acts on a folder (uv cache clean --cache-dir) is held to the same rules as removing
+            // it. It also follows a link in place of that folder and would clean the link's target, so the
+            // folder must still be a real directory.
             for path in op.paths {
                 if case .denied(let why) = denylist.check(path) {
                     problems.append(LocalizedMessage(verbatim: why).prefixed(Paths.abbreviate(path)))
+                } else if !Paths.isDirectory(path) {
+                    problems.append(LocalizedMessage("The folder was replaced by a link or a file, or it no longer exists. Scan again.").prefixed(Paths.abbreviate(path)))
                 }
             }
         }
@@ -266,18 +272,30 @@ public struct CleaningExecutor: Sendable {
             let reason = LocalizedMessage("Cannot write the operation log: \(error.localizedDescription)")
             return .skippingAll(plan, reason: reason.text, freeBytes: freeBefore)
         }
-        // Check outputs by argv: one `docker info` answers for every Docker operation of the plan.
-        var checkOutputs: [[String]: String?] = [:]
-
         for op in plan.operations {
+            // Once the log fails, the rest of the plan stops: nothing more is removed without a record.
+            if let lost = results.lazy.compactMap(\.logFailure).first {
+                let reason = LocalizedMessage("Stopped because the operation log cannot be written: \(lost)")
+                results.append(OperationResult(operation: op, status: .skipped(reason.text)))
+                continue
+            }
             if op.isPermanent, !confirmation.permanentConfirmed {
                 results.append(finish(op, .skipped(LocalizedMessage("Permanent deletion was not confirmed"))))
                 continue
             }
             var problems = blockerMessages(for: op)
-            if problems.isEmpty { problems = await preconditionProblems(for: op, outputs: &checkOutputs) }
+            if problems.isEmpty { problems = await preconditionProblems(for: op) }
             if !problems.isEmpty {
                 results.append(finish(op, .skipped(.joined(problems))))
+                continue
+            }
+            // The intent is recorded before anything runs, so even an interrupted operation leaves a trace.
+            do {
+                try log.record(entry: ["event": "start", "item": op.id, "action": Self.logAction(op)])
+            } catch {
+                var result = OperationResult(operation: op, status: .skipped(LocalizedMessage("Cannot write the operation log: \(error.localizedDescription)").text))
+                result.logFailure = error.localizedDescription
+                results.append(result)
                 continue
             }
             if let rust = op.rustArtifact {
@@ -296,20 +314,18 @@ public struct CleaningExecutor: Sendable {
         return CleaningReport(results: results, freeBefore: freeBefore, freeAfter: space.freeBytes())
     }
 
-    /// Runs each read-only check of `op` (reusing outputs already in `outputs`) and reports those whose
-    /// output no longer matches the scan.
-    func preconditionProblems(for op: CleaningOperation, outputs: inout [[String]: String?]) async -> [LocalizedMessage] {
+    /// Runs each read-only check of `op` and reports those whose output no longer matches the scan.
+    /// Answers are never reused for a later operation: an earlier one may run for minutes, and the engine
+    /// or folder behind an endpoint can change meanwhile.
+    func preconditionProblems(for op: CleaningOperation) async -> [LocalizedMessage] {
         var problems: [LocalizedMessage] = []
         for check in op.preconditions {
             guard CommandPolicy.isAllowedCheckCommand(check.argv), let executable = commands.locate(check.argv[0]) else {
                 problems.append(LocalizedMessage("Cannot verify the item before removing it. Scan again."))
                 continue
             }
-            if outputs[check.argv] == nil {
-                let result = try? await commands.run(executable: executable, arguments: Array(check.argv.dropFirst()))
-                outputs[check.argv] = result.flatMap { $0.status == 0 ? $0.output : nil }
-            }
-            if let output = outputs[check.argv] ?? nil, check.isSatisfied(by: output) { continue }
+            let result = try? await commands.run(executable: executable, arguments: Array(check.argv.dropFirst()))
+            if let result, result.status == 0, check.isSatisfied(by: result.output) { continue }
             problems.append(check.purpose.mismatch)
         }
         return problems
@@ -376,21 +392,31 @@ public struct CleaningExecutor: Sendable {
             status = .failed(why.text)
             logStatus = "failed: \(why.english)"
         }
-        let what: String = switch op.kind {
+        var entry: [String: Any] = [
+            "item": op.id,
+            "bytes": String(op.sizeBytes),
+            "action": Self.logAction(op),
+            "status": logStatus,
+        ]
+        if let output, !output.isEmpty { entry["output"] = output }
+        var result = OperationResult(operation: op, status: status, output: output, remainingPaths: remainingPaths)
+        do {
+            try log.record(entry: entry)
+        } catch {
+            // The operation already ran and cannot be undone; the result says so and the plan stops.
+            let note = LocalizedMessage("This result is missing from the operation log: \(error.localizedDescription)").text
+            result.output = [output, note].compactMap { $0 }.joined(separator: "\n")
+            result.logFailure = error.localizedDescription
+        }
+        return result
+    }
+
+    static func logAction(_ op: CleaningOperation) -> String {
+        switch op.kind {
         case .trash: "trash \(op.paths.joined(separator: ", "))"
         case .permanentDelete: "delete \(op.paths.joined(separator: ", "))"
         case .command(let argv): "run \(argv.joined(separator: " "))"
         }
-        var entry: [String: Any] = [
-            "item": op.id,
-            "bytes": String(op.sizeBytes),
-            "action": what,
-            "status": logStatus,
-        ]
-        if let output, !output.isEmpty { entry["output"] = output }
-        let note = log.recordAfterRun(entry)
-        let shownOutput = note.map { [output, $0].compactMap { $0 }.joined(separator: "\n") } ?? output
-        return OperationResult(operation: op, status: status, output: shownOutput, remainingPaths: remainingPaths)
     }
 }
 

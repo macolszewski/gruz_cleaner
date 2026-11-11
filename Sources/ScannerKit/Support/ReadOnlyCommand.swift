@@ -22,17 +22,19 @@ public enum ReadOnlyCommandError: Error, CustomStringConvertible {
 
 /// Runs only commands from `CommandPolicy`'s read-only list.
 enum ReadOnlyCommand {
-    static func run(_ argv: [String], timeout: TimeInterval = 60) async throws -> CommandOutput {
+    /// - Parameter environment: variables that switch off programs a tool would otherwise start
+    ///   (`GitInspection.environment(disablingFilters:)`), never ones that change what is read.
+    static func run(_ argv: [String], timeout: TimeInterval = 60, environment: [String: String] = [:]) async throws -> CommandOutput {
         guard CommandPolicy.isAllowedReadOnlyCommand(argv) else { throw ReadOnlyCommandError.notAllowed(argv) }
         guard let executable = ExecutableLocator.locate(argv[0]) else { throw ReadOnlyCommandError.toolNotFound(argv[0]) }
-        return try await Subprocess.run(executable: executable, arguments: Array(argv.dropFirst()), timeout: timeout)
+        return try await Subprocess.run(executable: executable, arguments: Array(argv.dropFirst()), timeout: timeout, environment: environment)
     }
 }
 
 /// Process launcher for read-only commands. Internal so other modules cannot reach it through ScannerKit.
 enum Subprocess {
-    static func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> CommandOutput {
-        let out = try await ProcessRunner.run(executable: executable, arguments: arguments, timeout: timeout)
+    static func run(executable: String, arguments: [String], timeout: TimeInterval, environment: [String: String] = [:]) async throws -> CommandOutput {
+        let out = try await ProcessRunner.run(executable: executable, arguments: arguments, timeout: timeout, environment: environment)
         if out.wasStopped { throw ReadOnlyCommandError.timedOut }
         return CommandOutput(status: out.status, stdout: out.stdout, stderr: String(decoding: out.stderr, as: UTF8.self))
     }

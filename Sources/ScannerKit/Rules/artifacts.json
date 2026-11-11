@@ -111,6 +111,21 @@
       "temp.*",
       "scripts-*"
     ],
+    "insideStrong": [
+      ".last_build_id",
+      "flutter_assets",
+      "intermediates",
+      "classes",
+      "kotlin",
+      "CMakeCache.txt",
+      "CMakeFiles",
+      "cmake_install.cmake",
+      "lib.*",
+      "bdist.*",
+      "temp.*",
+      "scripts-*"
+    ],
+    "rejectGitTracked": true,
     "insideNone": [
       "__init__.py",
       "*.py",

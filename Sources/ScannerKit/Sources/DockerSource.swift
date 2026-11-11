@@ -61,11 +61,16 @@ enum DockerSource {
             ).measured(info))
         }
 
-        // Independent queries; the engine identity is needed only if the usage report succeeds.
-        async let engineQuery = engineIdentity()
+        // Every query and every removal names the engine endpoint found here, so switching the CLI context
+        // (or DOCKER_HOST) later cannot point them at another engine.
+        guard let host = await currentHost() else {
+            if !items.isEmpty { await ctx.warnings.add(String(localized: "Docker: could not read the current context. Is OrbStack running?", bundle: .scannerKit)) }
+            return items
+        }
+        async let engineQuery = engineIdentity(host: host)
         let output: CommandOutput
         do {
-            output = try await ReadOnlyCommand.run(["docker", "system", "df", "-v", "--format", "{{json .}}"], timeout: 120)
+            output = try await ReadOnlyCommand.run(["docker", "--host", host, "system", "df", "-v", "--format", "{{json .}}"], timeout: 120)
         } catch {
             if !items.isEmpty { await ctx.warnings.add(String(localized: "Docker: could not read data (\(String(describing: error))). Is OrbStack running?", bundle: .scannerKit)) }
             return items
@@ -78,38 +83,57 @@ enum DockerSource {
             await ctx.warnings.add(String(localized: "Docker: unrecognized response format.", bundle: .scannerKit))
             return items
         }
-        let engine = await engineQuery
+        let engine = await engineQuery.map { Engine(host: host, identity: $0) }
         if engine == nil {
             await ctx.warnings.add(String(localized: "Docker: could not identify the engine, so Docker items cannot be removed in this scan.", bundle: .scannerKit))
         }
         return parse(df, engine: engine) + items
     }
 
-    static let engineIdentityCommand = ["docker", "info", "--format", "{{.ID}} {{.Name}}"]
+    /// The engine a scan read: its endpoint, passed to every later command, and its identity, checked
+    /// before each removal in case another engine now listens on the same endpoint (a socket link that
+    /// Docker Desktop and OrbStack both claim).
+    struct Engine: Equatable {
+        var host: String
+        var identity: String
+    }
 
-    /// Identifies the engine the CLI talks to. Removal commands run later through the same CLI, whose
-    /// current context may by then point to another engine with objects of the same names.
-    static func engineIdentity() async -> String? {
-        guard let out = try? await ReadOnlyCommand.run(engineIdentityCommand, timeout: 30), out.status == 0 else { return nil }
+    static let currentHostCommand = ["docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"]
+
+    /// Endpoint of the CLI's current context (or of DOCKER_HOST, which the default context reflects).
+    static func currentHost() async -> String? {
+        guard let out = try? await ReadOnlyCommand.run(currentHostCommand, timeout: 30), out.status == 0 else { return nil }
+        let host = String(decoding: out.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return host.isEmpty || host.hasPrefix("-") ? nil : host
+    }
+
+    static func engineIdentityCommand(host: String) -> [String] {
+        ["docker", "--host", host, "info", "--format", "{{.ID}} {{.Name}}"]
+    }
+
+    static func engineIdentity(host: String) async -> String? {
+        guard let out = try? await ReadOnlyCommand.run(engineIdentityCommand(host: host), timeout: 30), out.status == 0 else { return nil }
         let identity = String(decoding: out.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         return identity.isEmpty ? nil : identity
     }
 
-    /// Without an engine identity the items are shown but cannot be removed.
-    static func parse(_ df: SystemDF, engine: String?) -> [ScanItem] {
+    /// Without an engine the items are shown but cannot be removed.
+    static func parse(_ df: SystemDF, engine: Engine?) -> [ScanItem] {
         parse(df).map { bind($0, to: engine) }
     }
 
-    private static func bind(_ item: ScanItem, to engine: String?) -> ScanItem {
+    private static func bind(_ item: ScanItem, to engine: Engine?) -> ScanItem {
         var copy = item
         copy.children = item.children.map { bind($0, to: engine) }
-        guard copy.action != nil else { return copy }
-        if let engine {
-            let check = CommandCheck(argv: engineIdentityCommand, expected: engine, purpose: .dockerEngine)
-            copy.preconditions = [check] + (copy.preconditions ?? [])
-        } else {
+        guard case .command(let argv) = copy.action else { return copy }
+        guard let engine else {
             copy.action = nil
+            return copy
         }
+        let pin = { (argv: [String]) in [argv[0], "--host", engine.host] + argv.dropFirst() }
+        copy.action = .command(argv: pin(argv))
+        let check = CommandCheck(argv: engineIdentityCommand(host: engine.host), expected: engine.identity, purpose: .dockerEngine)
+        copy.preconditions = [check] + (copy.preconditions ?? []).map { CommandCheck(argv: pin($0.argv), expected: $0.expected, purpose: $0.purpose) }
         return copy
     }
 

@@ -8,7 +8,8 @@ enum RuleSource {
         var exclusions: [String: Set<String>] = [:]
         for rule in ctx.catalog.rules {
             var accepted: [String] = []
-            for path in matches(for: rule, home: ctx.options.home) {
+            var unreadable: [String] = []
+            for path in matches(for: rule, home: ctx.options.home, unreadable: &unreadable) {
                 if rule.action != nil, ctx.denylist.check(path) != .allowed { continue }
                 switch await ctx.claims.tryClaim(path) {
                 case .claimed:
@@ -25,10 +26,13 @@ enum RuleSource {
                 }
             }
             if !accepted.isEmpty { resolved.append((rule, accepted)) }
+            await ctx.warnings.addUnreadable(unreadable)
         }
 
         var sizes = await SizeCalculator.measureAll(resolved.flatMap(\.1).filter { exclusions[$0] == nil })
         for (path, excluded) in exclusions { sizes[path] = SizeCalculator.measure(path, excluding: excluded) }
+        // An item measured at zero is left out; when that zero only means "could not read", say so.
+        await ctx.warnings.addUnreadable(sizes.filter { $0.value.allocatedBytes == 0 && $0.value.isPartial }.map(\.key))
 
         let checkouts = resolved.filter(\.0.gitStatusCheck).flatMap(\.1)
         let gitNotes = await concurrentMap(checkouts, width: 4) { await ProjectSource.gitStatusNote($0) }.compactMapValues { $0 }
@@ -43,7 +47,14 @@ enum RuleSource {
     }
 
     static func matches(for rule: Rule, home: String) -> [String] {
-        let bases = rule.paths.flatMap { Paths.glob($0, home: home) }
+        var unreadable: [String] = []
+        return matches(for: rule, home: home, unreadable: &unreadable)
+    }
+
+    static func matches(for rule: Rule, home: String, unreadable: inout [String]) -> [String] {
+        let expansions = rule.paths.map { Paths.globReporting($0, home: home) }
+        unreadable += expansions.flatMap(\.unreadable)
+        let bases = expansions.flatMap(\.matches)
         let filtered = bases.filter { path in
             let name = (path as NSString).lastPathComponent
             if rule.gitStatusCheck, !Paths.exists(Paths.join(path, ".git")) { return false }

@@ -26,7 +26,7 @@ Record dates come from `created_at_epoch` (milliseconds). A prompt's project com
 The preview only reads the database and files. It shows the record ids and file paths in the selected range before anything is removed. After confirmation, GRUZ:
 
 1. Takes a lock so that only one GRUZ instance maintains a given data folder.
-2. Checks the worker: it must serve the same database file, report version 13.x from 13.28.0 on, and have no active sessions, no processing in progress and an empty queue.
+2. Checks the worker: it must serve the same database file, report version 13.x from 13.28.0 on, and have no active sessions, no processing in progress and an empty queue, as the worker itself reports them. Rows an earlier claude-mem version left in the `pending_messages` table are shown in the preview but do not block maintenance: the worker keeps its queue in memory and never processes them, and GRUZ does not remove them.
 3. Compares the current records and files with the preview. Any difference stops the operation; the preview must be refreshed and confirmed again.
 4. Prepares the local indexing environment before deleting anything (this may download dependencies on first use).
 5. Makes a consistent SQLite copy with the SQLite backup API (which handles WAL correctly, unlike copying the file) and writes a maintenance marker, `.cleaner-maintenance.json`, into the data folder.

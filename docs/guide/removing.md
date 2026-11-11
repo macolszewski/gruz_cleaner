@@ -104,6 +104,7 @@ grow after the sheet closes.
 
 Every confirmed operation, including skipped, failed and partly done ones, is appended as one JSON
 line to `~/Library/Logs/GRUZ/operations.log`: the time, the item, its size, the action with exact paths
-or command, the status with the paths that failed, and the command output. If the log cannot be
-written, nothing is removed. The result sheet shows the log path, and
+or command, the status with the paths that failed, and the command output. Each operation is also
+recorded right before it starts. If the log cannot be written, nothing is removed; if it stops working
+partway, the remaining operations are skipped. The result sheet shows the log path, and
 **Show Operation Log in Finder** in [Settings > Access](settings.md#access) opens it.

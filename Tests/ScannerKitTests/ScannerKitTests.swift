@@ -31,8 +31,12 @@ struct Fixture {
 
 @Suite struct CommandPolicyTests {
     @Test func allowsKnownCleanCommands() {
-        #expect(CommandPolicy.isAllowedCleanCommand(["docker", "image", "rm", "nginx:alpine"]))
-        #expect(CommandPolicy.isAllowedCleanCommand(["docker", "builder", "prune", "--force"]))
+        let sock = "unix:///Users/me/.orbstack/run/docker.sock"
+        #expect(CommandPolicy.isAllowedCleanCommand(["docker", "--host", sock, "image", "rm", "nginx:alpine"]))
+        #expect(CommandPolicy.isAllowedCleanCommand(["docker", "--host", sock, "builder", "prune", "--force"]))
+        // A Docker command must name the engine endpoint, never rely on the CLI's current context.
+        #expect(!CommandPolicy.isAllowedCleanCommand(["docker", "image", "rm", "nginx:alpine"]))
+        #expect(!CommandPolicy.isAllowedCleanCommand(["docker", "--host", "-H", "image", "rm", "nginx:alpine"]))
         #expect(CommandPolicy.isAllowedCleanCommand(["xcrun", "simctl", "delete", "2CC2A9FF-BC88-4309-87CE-AE583195DD9B"]))
         #expect(CommandPolicy.isAllowedCleanCommand(["uv", "cache", "clean", "--cache-dir", "/Users/me/.cache/uv"]))
         // Without the folder, uv would clean whatever cache its configuration points to.
@@ -52,10 +56,11 @@ struct Fixture {
 
     @Test func rejectsEverythingElse() {
         #expect(!CommandPolicy.isAllowedCleanCommand(["rm", "-rf", "/"]))
-        #expect(!CommandPolicy.isAllowedCleanCommand(["docker", "system", "prune", "-a"]))
-        #expect(!CommandPolicy.isAllowedCleanCommand(["docker", "volume", "rm", "-f"]))
-        #expect(!CommandPolicy.isAllowedCleanCommand(["docker", "volume", "rm", "a", "b"]))
-        #expect(!CommandPolicy.isAllowedCleanCommand(["docker", "volume", "prune"]))
+        let host = ["docker", "--host", "unix:///var/run/docker.sock"]
+        #expect(!CommandPolicy.isAllowedCleanCommand(host + ["system", "prune", "-a"]))
+        #expect(!CommandPolicy.isAllowedCleanCommand(host + ["volume", "rm", "-f"]))
+        #expect(!CommandPolicy.isAllowedCleanCommand(host + ["volume", "rm", "a", "b"]))
+        #expect(!CommandPolicy.isAllowedCleanCommand(host + ["volume", "prune"]))
         #expect(!CommandPolicy.isAllowedCleanCommand([]))
     }
 
@@ -123,6 +128,30 @@ struct Fixture {
         #expect(d.check(fx.path("home/.npm/_npx/main.swift")) != .allowed)
         // Removing the link itself only removes the link.
         #expect(d.check(fx.path("home/.npm/_npx")) == .allowed)
+    }
+
+    @Test func unreadableFolderMayHidePreservedData() throws {
+        // Local History cannot be ruled out inside an IDE folder that cannot be entered, so the whole
+        // JetBrains folder must not be taken by a broad cache rule.
+        let fx = try Fixture()
+        try fx.file("home/Library/Caches/JetBrains/Rider2025.2/LocalHistory/changes.storageData")
+        try fx.file("home/Library/Caches/JetBrains/other.bin", contents: "x")
+        let ide = fx.path("home/Library/Caches/JetBrains/Rider2025.2")
+        chmod(ide, 0)
+        defer { chmod(ide, 0o755) }
+        let d = Denylist(home: fx.path("home"))
+        #expect(d.check(fx.path("home/Library/Caches/JetBrains")) != .allowed)
+        #expect(d.check(fx.path("home/Library/Caches/JetBrains/other.bin")) == .allowed)
+    }
+
+    @Test func everyRemovalRootChecksLinksBelowIt() {
+        // An Android system image linked to a project folder must not turn its sources into "SDK data".
+        let home = "/Users/tester"
+        for root in Paths.removalRoots(home: home) {
+            #expect(Paths.trustedAnchor(of: root + "/system-images/android-35/src", home: home) == root)
+        }
+        #expect(Paths.trustedAnchor(of: home + "/Library/Caches/x", home: home) == home)
+        #expect(Paths.trustedAnchor(of: "/Applications/X.app", home: home) == nil)
     }
 
     @Test func dataThatCannotBeRecreatedIsKeptInsideCaches() throws {
@@ -273,6 +302,26 @@ struct Fixture {
         #expect(other.children.map(\.title) == ["com.example.tool"])
     }
 
+    @Test func foldersThatCannotBeReadAreReported() async throws {
+        let fx = try Fixture()
+        try fx.file("home/Library/Caches/com.example.tool/x", bytes: 5_000)
+        try fx.file("home/workspace/app/locked/node_modules/x/index.js", bytes: 5_000)
+        let locked = [fx.path("home/Library/Caches"), fx.path("home/workspace/app/locked")]
+        for path in locked { chmod(path, 0) }
+        defer { for path in locked { chmod(path, 0o755) } }
+
+        let ctx = ScanContext(
+            catalog: try RuleCatalog.builtIn(),
+            options: ScanOptions(projectRoots: [fx.path("home/workspace")], home: fx.path("home")), claims: ClaimRegistry(),
+            denylist: Denylist(home: fx.path("home")), warnings: WarningSink()
+        )
+        _ = await RuleSource.scan(ctx)
+        _ = await ProjectSource.scan(ctx)
+        let warning = try #require(await ctx.warnings.messages.first { $0.contains("could not be read") })
+        #expect(warning.contains("Library/Caches"))
+        #expect(warning.contains("locked"))
+    }
+
     @Test func informationalRuleMeasuresTheRemainderAroundClaimedPaths() async throws {
         let fx = try Fixture()
         try fx.file("home/.tool/cache/blob", bytes: 40_000)
@@ -315,13 +364,16 @@ struct Fixture {
      "BuildCache":[{"InUse":"false","Shared":"false","Size":"8.6GB"},{"InUse":"true","Size":"1GB"}]}
     """
 
+    static let host = "unix:///Users/me/.orbstack/run/docker.sock"
+    let engine = DockerSource.Engine(host: host, identity: "engine-1")
+
     @Test func parsesUnusedResourcesOnly() throws {
         let df = try JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8))
-        let items = DockerSource.parse(df, engine: "engine-1")
+        let items = DockerSource.parse(df, engine: engine)
         let images = try #require(items.first { $0.id == "docker.images.unused" })
         #expect(images.children.count == 2)
-        #expect(images.children.contains { $0.action == .command(argv: ["docker", "image", "rm", "shop-worker:audit"]) })
-        #expect(images.children.contains { $0.action == .command(argv: ["docker", "image", "rm", "sha256:ccccccccccccccc"]) })
+        #expect(images.children.contains { $0.action == .command(argv: ["docker", "--host", Self.host, "image", "rm", "shop-worker:audit"]) })
+        #expect(images.children.contains { $0.action == .command(argv: ["docker", "--host", Self.host, "image", "rm", "sha256:ccccccccccccccc"]) })
 
         let named = try #require(items.first { $0.id == "docker.volumes.named" })
         #expect(named.children.map(\.title) == ["shop_db"])
@@ -341,17 +393,21 @@ struct Fixture {
 
     @Test func removalsAreBoundToTheScannedEngineAndImage() throws {
         let df = try JSONDecoder().decode(DockerSource.SystemDF.self, from: Data(json.utf8))
-        let leaves = DockerSource.parse(df, engine: "engine-1").flatMap(\.leaves).filter { $0.action != nil }
+        let leaves = DockerSource.parse(df, engine: engine).flatMap(\.leaves).filter { $0.action != nil }
         #expect(!leaves.isEmpty)
-        let engineCheck = CommandCheck(argv: DockerSource.engineIdentityCommand, expected: "engine-1", purpose: .dockerEngine)
+        let engineCheck = CommandCheck(argv: DockerSource.engineIdentityCommand(host: Self.host), expected: "engine-1", purpose: .dockerEngine)
         #expect(leaves.allSatisfy { $0.preconditions?.contains(engineCheck) == true })
+        for leaf in leaves {
+            guard case .command(let argv) = leaf.action else { continue }
+            #expect(CommandPolicy.isAllowedCleanCommand(argv))
+        }
         for check in leaves.flatMap({ $0.preconditions ?? [] }) {
             #expect(CommandPolicy.isAllowedCheckCommand(check.argv))
         }
         // A tag can move to another image after a pull or build; the scanned image id is checked first.
         let tagged = try #require(leaves.first { $0.title == "shop-worker:audit" })
         #expect(tagged.preconditions?.contains(CommandCheck(
-            argv: ["docker", "image", "inspect", "--format", "{{.Id}}", "shop-worker:audit"], expected: "sha256:aaa", purpose: .dockerImage
+            argv: ["docker", "--host", Self.host, "image", "inspect", "--format", "{{.Id}}", "shop-worker:audit"], expected: "sha256:aaa", purpose: .dockerImage
         )) == true)
     }
 
@@ -420,6 +476,40 @@ struct Fixture {
         #expect(paths.contains(fx.path("ws/lib/build")))
         #expect(paths.contains(fx.path("ws/android/build")))
         #expect(!paths.contains(fx.path("ws/cpp/build")))
+    }
+
+    @Test func buildFolderWithOnlyGenericNamesIsCautionAndTrackedSourcesAreKept() async throws {
+        let fx = try Fixture()
+        // Sources declared under build/lib: the generic name "lib" is all that matches.
+        try fx.file("ws/pkg/pyproject.toml")
+        try fx.file("ws/pkg/build/lib/helpers.py", bytes: 5_000)
+        // The same layout committed to Git is source code.
+        try fx.file("ws/repo/pyproject.toml")
+        try fx.file("ws/repo/build/lib/helpers.py", bytes: 5_000)
+        // CMake output is recognized by a file only CMake writes.
+        try fx.file("ws/cpp/CMakeLists.txt")
+        try fx.file("ws/cpp/build/CMakeCache.txt", bytes: 5_000)
+        let git = { (args: [String]) throws in
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            p.arguments = ["-C", fx.path("ws/repo"), "-c", "user.name=t", "-c", "user.email=t@example.com"] + args
+            try p.run()
+            p.waitUntilExit()
+        }
+        try git(["init", "-q"])
+        try git(["add", "."])
+        try git(["commit", "-qm", "init"])
+
+        let ctx = ScanContext(
+            catalog: try RuleCatalog.builtIn(), options: ScanOptions(projectRoots: [fx.path("ws")], home: fx.path("home")),
+            claims: ClaimRegistry(), denylist: Denylist(home: fx.root), warnings: WarningSink()
+        )
+        let leaves = await ProjectSource.scan(ctx).flatMap(\.leaves)
+        let pkg = try #require(leaves.first { $0.paths == [fx.path("ws/pkg/build")] })
+        #expect(pkg.safety == .caution)
+        #expect(!leaves.contains { $0.paths == [fx.path("ws/repo/build")] })
+        let cpp = try #require(leaves.first { $0.paths == [fx.path("ws/cpp/build")] })
+        #expect(cpp.safety == .regenerable)
     }
 
     @Test func testResultsNeedTheirTestRunner() throws {
@@ -540,6 +630,37 @@ struct Fixture {
         #expect(try #require(ids.firstIndex(of: "codex.worktrees")) < #require(ids.firstIndex(of: "codex.data")))
     }
 
+    @Test func gitStatusDoesNotRunConfiguredFilters() async throws {
+        let fx = try Fixture()
+        try fx.file("repo/f.txt", contents: "a\n")
+        try fx.file("repo/.gitattributes", contents: "*.txt filter=mark\n")
+        let marker = fx.path("filter-ran")
+        func git(_ args: String...) throws {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            p.arguments = ["-C", fx.path("repo"), "-c", "user.name=t", "-c", "user.email=t@example.com"] + args
+            try p.run()
+            p.waitUntilExit()
+        }
+        try git("init", "-q")
+        try git("add", ".")
+        try git("commit", "-qm", "init")
+        try git("config", "filter.mark.clean", "touch '\(marker)'; cat")
+        // An older modification time makes Git re-read the file through its filter.
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 0)], ofItemAtPath: fx.path("repo/f.txt"))
+        _ = await ProjectSource.gitStatusNote(fx.path("repo"))
+        #expect(!FileManager.default.fileExists(atPath: marker))
+    }
+
+    @Test func filterNamesComeFromConfigKeys() {
+        let config = "filter.lfs.clean git-lfs clean -- %f\nfilter.lfs.process git-lfs filter-process\nfilter.a.b.smudge cat\nfilter.x\n"
+        #expect(GitInspection.filterNames(fromConfig: config) == ["a.b", "lfs"])
+        let env = GitInspection.environment(disablingFilters: ["lfs"])
+        #expect(env["GIT_CONFIG_COUNT"] == "3")
+        #expect(env["GIT_CONFIG_KEY_0"] == "filter.lfs.clean" && env["GIT_CONFIG_VALUE_0"] == "")
+        #expect(GitInspection.environment(disablingFilters: []).isEmpty)
+    }
+
     @Test func jetBrainsRuleNeverCoversLocalHistory() throws {
         let catalog = try RuleCatalog.builtIn()
         let rule = try #require(catalog.rules.first { $0.id == "jetbrains.caches" })
@@ -612,6 +733,32 @@ struct Fixture {
         #expect(!out.wasStopped)
         #expect(String(decoding: out.stdout, as: UTF8.self).hasPrefix("ready"))
         #expect(Date().timeIntervalSince(started) < 10)
+    }
+
+    @Test func helpersDoNotOutliveTheProgram() async throws {
+        // Work a program leaves behind must not go on after its result is reported, whether it exited
+        // on its own or was stopped at the deadline.
+        let fx = try Fixture()
+        let finished = try await ProcessRunner.run(
+            executable: "/bin/sh", arguments: ["-c", "(/bin/sleep 1; touch '\(fx.path("after-exit"))') &"], timeout: 20
+        )
+        let stopped = try await ProcessRunner.run(
+            executable: "/bin/sh", arguments: ["-c", "(/bin/sleep 1; touch '\(fx.path("after-stop"))') & /bin/sleep 30"], timeout: 0.3
+        )
+        #expect(!finished.wasStopped)
+        #expect(stopped.wasStopped)
+        try await Task.sleep(for: .seconds(2))
+        #expect(!FileManager.default.fileExists(atPath: fx.path("after-exit")))
+        #expect(!FileManager.default.fileExists(atPath: fx.path("after-stop")))
+    }
+
+    @Test func reportsTheExitCodeAndMissingPrograms() async throws {
+        let out = try await ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "echo oops >&2; exit 3"], timeout: 20)
+        #expect(out.status == 3)
+        #expect(String(decoding: out.stderr, as: UTF8.self) == "oops\n")
+        await #expect(throws: (any Error).self) {
+            _ = try await ProcessRunner.run(executable: "/nonexistent/tool", arguments: [], timeout: 5)
+        }
     }
 
     @Test func boundsTheOutput() async throws {

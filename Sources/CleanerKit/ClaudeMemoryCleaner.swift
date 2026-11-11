@@ -82,10 +82,9 @@ public actor ClaudeMemoryCleaner {
             if !identity.running, !rebuildOnly {
                 throw LocalizedMessage("Maintenance was interrupted. Choose “Rebuild Indexes” first.")
             }
+            // Pending work is what the worker reports (`checkIdle`). Current workers keep their queue in
+            // memory and never replay rows left in `pending_messages`, so waiting for that table would never end.
             let current = try ClaudeMemoryReader(location: location).preview(filter: preview.filter)
-            guard current.pendingMessages == 0 else {
-                throw LocalizedMessage("The claude-mem queue holds \(current.pendingMessages) messages. Wait until it is empty.")
-            }
             if !rebuildOnly {
                 guard current.records == preview.records, current.files == preview.files else {
                     throw LocalizedMessage("The data changed since the preview. Refresh the list and confirm the new scope.")
@@ -178,11 +177,11 @@ public actor ClaudeMemoryCleaner {
                 let staging = reusable ?? location.root.appendingPathComponent(".cleaner-chroma-\(UUID().uuidString)")
                 if reusable == nil {
                     try await runtime.rebuildIndex(location: location, destination: staging, progress: progress)
-                    // The rebuild read one snapshot; check the result against the database as it is now, so a
-                    // write that landed during the rebuild cannot leave the installed index behind.
-                    try await runtime.verifyIndex(location: location, destination: staging)
                 }
                 try await runtime.checkStopped(location: location)
+                // The rebuild read one snapshot; the index is checked against the database as it is now, right
+                // before it is installed, and the helper refuses it when the database changes while it compares.
+                try await runtime.verifyIndex(location: location, destination: staging)
                 try installIndex(staging, location: location, backup: backup)
             }
             report.indexRebuilt = true

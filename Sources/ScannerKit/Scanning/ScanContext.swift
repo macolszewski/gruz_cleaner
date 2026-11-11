@@ -81,6 +81,19 @@ struct ScanContext: Sendable {
 }
 
 actor WarningSink {
-    private(set) var messages: [String] = []
-    func add(_ message: String) { messages.append(message) }
+    private var notes: [String] = []
+    private var unreadable: Set<String> = []
+
+    func add(_ message: String) { notes.append(message) }
+
+    /// Places the scan could not look into or measure. They are reported even when no item comes from
+    /// them, because a missing item would otherwise read as "nothing there".
+    func addUnreadable(_ paths: [String]) { unreadable.formUnion(paths) }
+
+    var messages: [String] {
+        guard !unreadable.isEmpty else { return notes }
+        let shown = unreadable.sorted().prefix(3).map(Paths.abbreviate)
+        let list = shown.joined(separator: ", ") + (unreadable.count > shown.count ? ", …" : "")
+        return notes + [String(localized: "Some folders could not be read, so data in them is missing from this scan: \(list)", bundle: .scannerKit)]
+    }
 }

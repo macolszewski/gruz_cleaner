@@ -82,3 +82,5 @@
 "The image tag now points to a different image. Scan again." = "Tag wskazuje teraz inny obraz. Wykonaj nowy skan.";
 "This result is missing from the operation log: %@" = "Tego wyniku brakuje w dzienniku operacji: %@";
 "The index does not match the database: %@" = "Indeks nie odpowiada bazie: %@";
+"Stopped because the operation log cannot be written: %@" = "Wstrzymano, bo nie da się zapisać dziennika operacji: %@";
+"The folder was replaced by a link or a file, or it no longer exists. Scan again." = "Folder został zastąpiony dowiązaniem lub plikiem albo już nie istnieje. Zeskanuj ponownie.";

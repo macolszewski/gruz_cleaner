@@ -22,7 +22,9 @@ enum ProjectSource {
         }
         var found: [Found] = []
         for root in roots {
-            found += findArtifacts(in: root, definitions: ctx.catalog.artifacts, home: ctx.options.home)
+            var unreadable: [String] = []
+            found += findArtifacts(in: root, definitions: ctx.catalog.artifacts, home: ctx.options.home, unreadable: &unreadable)
+            await ctx.warnings.addUnreadable(unreadable)
         }
 
         // Expand container artifacts (worktrees) into their children.
@@ -40,6 +42,7 @@ enum ProjectSource {
 
         var accepted: [Found] = []
         for leaf in leaves where ctx.denylist.check(leaf.path) == .allowed {
+            if leaf.definition.rejectGitTracked, await hasGitTrackedFiles(leaf.path) { continue }
             if await ctx.claims.claim(leaf.path) { accepted.append(leaf) }
         }
         let sizes = await SizeCalculator.measureAll(accepted.filter { $0.definition.id != "artifact.rust-target" }.map(\.path))
@@ -53,7 +56,12 @@ enum ProjectSource {
         for definition in ctx.catalog.artifacts {
             let children = accepted.filter { $0.definition.id == definition.id }.compactMap { leaf -> ScanItem? in
                 guard let info = sizes[leaf.path], info.allocatedBytes > 0 else { return nil }
-                return makeItem(definition, path: leaf.path, root: leaf.root, info: info, note: gitNotes[leaf.path])
+                var item = makeItem(definition, path: leaf.path, root: leaf.root, info: info, note: gitNotes[leaf.path])
+                if matchedOnlyGenericNames(definition, path: leaf.path) {
+                    item.safety = .caution
+                    item.note = String(localized: "Only generic folder names (such as lib or tmp) suggest that a build tool made this folder. Check its contents before removing it.", bundle: .scannerKit)
+                }
+                return item
             }
             if let group = makeGroup(definition, children: children) { items.append(group) }
         }
@@ -89,6 +97,12 @@ enum ProjectSource {
     }
 
     static func findArtifacts(in root: String, definitions: [ArtifactDefinition], home: String) -> [Found] {
+        var unreadable: [String] = []
+        return findArtifacts(in: root, definitions: definitions, home: home, unreadable: &unreadable)
+    }
+
+    /// - Parameter unreadable: folders the walk could not enter; artifacts inside them are missing.
+    static func findArtifacts(in root: String, definitions: [ArtifactDefinition], home: String, unreadable: inout [String]) -> [Found] {
         var byName: [String: [ArtifactDefinition]] = [:]
         for d in definitions { for n in d.dirNames { byName[n, default: []].append(d) } }
         let hiddenParents = definitions.compactMap(\.parentName).filter { $0.hasPrefix(".") }
@@ -98,11 +112,19 @@ enum ProjectSource {
         let cRoot = strdup(root)
         defer { free(cRoot) }
         var argv: [UnsafeMutablePointer<CChar>?] = [cRoot, nil]
-        guard let fts = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, nil) else { return [] }
+        guard let fts = fts_open(&argv, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, nil) else {
+            unreadable.append(root)
+            return []
+        }
         defer { fts_close(fts) }
 
         while let entry = fts_read(fts) {
-            guard Int32(entry.pointee.fts_info) == FTS_D, entry.pointee.fts_level > 0 else { continue }
+            let kind = Int32(entry.pointee.fts_info)
+            if kind == FTS_DNR || kind == FTS_ERR, entry.pointee.fts_errno != ENOENT {
+                unreadable.append(String(cString: entry.pointee.fts_path))
+                continue
+            }
+            guard kind == FTS_D, entry.pointee.fts_level > 0 else { continue }
             if Task.isCancelled { break }
             let path = String(cString: entry.pointee.fts_path)
             let name = (path as NSString).lastPathComponent
@@ -159,9 +181,32 @@ enum ProjectSource {
         return needles.contains { text.contains($0) }
     }
 
+    /// True when `definition` names tool-specific entries and none of them is inside `path`.
+    static func matchedOnlyGenericNames(_ definition: ArtifactDefinition, path: String) -> Bool {
+        guard !definition.insideStrong.isEmpty else { return false }
+        let inside = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
+        return !inside.contains { name in definition.insideStrong.contains { Paths.fnmatch($0, name) } }
+    }
+
+    /// Build output is ignored by Git; tracked files mean the folder is part of the project's sources.
+    /// Outside a repository (or when Git cannot answer) nothing is known, and the other checks decide.
+    static func hasGitTrackedFiles(_ path: String) async -> Bool {
+        guard let out = try? await ReadOnlyCommand.run(["git"] + GitInspection.options + ["-C", path, "ls-files"], timeout: 20),
+              out.status == 0 else { return false }
+        return !out.stdout.isEmpty
+    }
+
     static func gitStatusNote(_ path: String) async -> String? {
-        guard let out = try? await ReadOnlyCommand.run(["git"] + GitInspection.options + ["-C", path, "status", "--porcelain"], timeout: 20),
-              out.status == 0 else { return String(localized: "Could not check the Git status", bundle: .scannerKit) }
+        let couldNotCheck = String(localized: "Could not check the Git status", bundle: .scannerKit)
+        // `git status` runs the clean filters a repository configures (Git LFS and others) on files it
+        // re-reads. Their names come from plain config reading, then each is switched off for the status run.
+        guard let config = try? await ReadOnlyCommand.run(["git"] + GitInspection.options + ["-C", path, "config", "--get-regexp", "^filter\\."], timeout: 20),
+              config.status == 0 || (config.status == 1 && config.stdout.isEmpty) else { return couldNotCheck }
+        let filters = GitInspection.filterNames(fromConfig: String(decoding: config.stdout, as: UTF8.self))
+        guard let out = try? await ReadOnlyCommand.run(
+            ["git"] + GitInspection.options + ["-C", path, "status", "--porcelain"], timeout: 20,
+            environment: GitInspection.environment(disablingFilters: filters)
+        ), out.status == 0 else { return couldNotCheck }
         let lines = String(decoding: out.stdout, as: UTF8.self).split(separator: "\n").count
         return lines == 0 ? String(localized: "Git: no uncommitted changes", bundle: .scannerKit) : String(localized: "Git: \(lines) uncommitted changes. Check before removing!", bundle: .scannerKit)
     }

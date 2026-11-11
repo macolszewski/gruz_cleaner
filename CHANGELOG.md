@@ -24,6 +24,36 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - Project items from definitions with several folder names now show the folder (`app/bin`, `app/obj`)
   instead of the same project name twice.
+- Rows an earlier claude-mem version left in `pending_messages` no longer block maintenance forever.
+  The worker's own queue (which it keeps in memory) decides; the rows are shown and left untouched.
+
+### Fixed
+
+Fixes from a second technical audit, of 1.0.1.
+
+- Docker commands could reach another engine when the CLI context changed during a long plan, because
+  the engine check ran once per plan. Every Docker read and removal now names the endpoint found during
+  the scan (`docker --host`), and the engine identity is checked again before each operation.
+- `uv cache clean` follows a symbolic link put in place of the scanned cache folder and cleans its
+  target. Commands that act on a folder now run only while it is still a real directory.
+- The symlinked-folder check covered only the home and temporary folders, not the Android SDK under
+  `/opt/homebrew`. It now covers every place where removal is allowed.
+- A `build` folder with only generic names inside (`lib`, `tmp`) was offered as regenerable build
+  output. Such folders are now **Caution** with a note, and folders with files tracked by Git are
+  not offered at all.
+- A folder the scan could not read looked the same as an empty one. Unreadable places are now listed
+  in a scan warning, and a cache folder that may hide JetBrains Local History it cannot read is
+  protected instead of offered.
+- `git status` during a scan ran clean filters configured in the repository (Git LFS and others).
+  They are now switched off for the scan.
+- When the operation log failed partway through a plan, the remaining operations still ran. The plan
+  now stops, and each operation is recorded before it starts.
+- Stopping a command at its deadline signalled only the command, not the helpers it started. Commands
+  now run in their own process group; stopping one ends the whole group, and helpers left behind when
+  it exits are ended before its result is reported.
+- A write to the claude-mem database while the rebuilt index was being compared could go unnoticed.
+  The comparison now runs right before the index is installed and fails when the database changed
+  during it.
 
 ## [1.0.1]
 

@@ -2,26 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>The claude-mem queue holds %lld messages. Wait until it is empty.</key>
-	<dict>
-		<key>NSStringLocalizedFormatKey</key>
-		<string>Kolejka claude-mem zawiera %#@messages@. Poczekaj na jej opróżnienie.</string>
-		<key>messages</key>
-		<dict>
-			<key>NSStringFormatSpecTypeKey</key>
-			<string>NSStringPluralRuleType</string>
-			<key>NSStringFormatValueTypeKey</key>
-			<string>lld</string>
-			<key>one</key>
-			<string>%lld wiadomość</string>
-			<key>few</key>
-			<string>%lld wiadomości</string>
-			<key>many</key>
-			<string>%lld wiadomości</string>
-			<key>other</key>
-			<string>%lld wiadomości</string>
-		</dict>
-	</dict>
 	<key>Removed only part of the data (%lld records):</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>

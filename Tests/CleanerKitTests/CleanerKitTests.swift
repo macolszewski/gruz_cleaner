@@ -31,9 +31,14 @@ final class FakeCommands: CommandRunning, @unchecked Sendable {
     /// Output of read-only checks, by arguments joined with spaces.
     var outputs: [String: String] = [:]
 
+    /// Called after each command, to change what later checks see.
+    var afterCall: (([String]) -> Void)?
+
     func run(executable: String, arguments: [String]) async throws -> (status: Int32, output: String) {
         lock.withLock { calls.append([executable] + arguments) }
-        return (0, outputs[arguments.joined(separator: " ")] ?? "")
+        let output = outputs[arguments.joined(separator: " ")] ?? ""
+        afterCall?(arguments)
+        return (0, output)
     }
 }
 
@@ -46,16 +51,22 @@ final class FakeLog: OperationLogging, @unchecked Sendable {
     private let lock = NSLock()
     private(set) var lines: [String] = []
     var isWritable = true
+    /// Number of lines written before the disk "fills up".
+    var capacity = Int.max
 
     func record(_ line: String) throws {
-        guard isWritable else { throw CocoaError(.fileWriteVolumeReadOnly) }
-        lock.withLock { lines.append(line) }
+        try lock.withLock {
+            guard isWritable, lines.count < capacity else { throw CocoaError(.fileWriteOutOfSpace) }
+            lines.append(line)
+        }
     }
 
-    /// Entries describing operations, without the line that opens each plan.
-    var operations: [[String: String]] {
-        lines.compactMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: String] }.filter { $0["item"] != nil }
+    var entries: [[String: String]] {
+        lines.compactMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: String] }
     }
+
+    /// Results of operations, without the lines that open a plan or an operation.
+    var operations: [[String: String]] { entries.filter { $0["item"] != nil && $0["event"] == nil } }
 }
 
 struct FakeSpace: FreeSpaceProviding {
@@ -171,16 +182,56 @@ struct TestEnvironment {
         }
     }
 
+    static let host = "unix:///Users/me/.orbstack/run/docker.sock"
+    static let infoArgs = ["--host", host, "info", "--format", "{{.ID}} {{.Name}}"]
+
+    func dockerItem(_ h: TestEnvironment, _ volume: String) -> ScanItem {
+        var item = h.item(volume, paths: [], action: .command(argv: ["docker", "--host", Self.host, "volume", "rm", volume]))
+        item.preconditions = [CommandCheck(argv: ["docker"] + Self.infoArgs, expected: "engine-1 orbstack", purpose: .dockerEngine)]
+        return item
+    }
+
+    @Test func everyOperationIsLoggedBeforeItRuns() async throws {
+        let h = try TestEnvironment()
+        let path = try h.make("Library/Caches/a")
+        let plan = CleaningPlan.make(from: [h.item("a", paths: [path], action: .trash)])
+        _ = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: false))
+        #expect(h.log.entries.map { $0["event"] ?? "result" } == ["plan", "start", "result"])
+        #expect(h.log.entries[1]["action"] == "trash \(path)")
+    }
+
+    @Test func thePlanStopsWhenTheLogFailsHalfway() async throws {
+        let h = try TestEnvironment()
+        let paths = try ["a", "b", "c"].map { try h.make("Library/Caches/\($0)") }
+        // The plan line, the start of "a" and its result fit; then the disk is full.
+        h.log.capacity = 3
+        let plan = CleaningPlan.make(from: paths.enumerated().map { h.item("op\($0.offset)", paths: [$0.element], action: .trash) })
+        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: false))
+        #expect(h.files.trashed == [paths[0]])
+        #expect(report.doneCount == 1)
+        #expect(report.results.dropFirst().allSatisfy { if case .skipped = $0.status { true } else { false } })
+
+        // A failure to record a result that already happened also stops what follows.
+        let h2 = try TestEnvironment()
+        let paths2 = try ["a", "b"].map { try h2.make("Library/Caches/\($0)") }
+        h2.log.capacity = 2
+        let plan2 = CleaningPlan.make(from: paths2.enumerated().map { h2.item("op\($0.offset)", paths: [$0.element], action: .trash) })
+        let report2 = await h2.executor().execute(plan2, confirmation: CleaningConfirmation(planID: plan2.id, permanentConfirmed: false))
+        #expect(h2.files.trashed == [paths2[0]])
+        #expect(report2.results.first?.output?.isEmpty == false)
+        guard case .skipped = report2.results.last?.status else {
+            Issue.record("expected a skip")
+            return
+        }
+    }
+
     @Test func dockerCommandsRunOnlyAgainstTheScannedEngine() async throws {
         let h = try TestEnvironment()
-        let infoArgs = ["info", "--format", "{{.ID}} {{.Name}}"]
-        var item = h.item("vol", paths: [], action: .command(argv: ["docker", "volume", "rm", "shop_db"]))
-        item.preconditions = [CommandCheck(argv: ["docker"] + infoArgs, expected: "engine-1 orbstack", purpose: .dockerEngine)]
-        let plan = CleaningPlan.make(from: [item])
+        let plan = CleaningPlan.make(from: [dockerItem(h, "shop_db")])
         let confirmation = CleaningConfirmation(planID: plan.id, permanentConfirmed: true)
 
-        // The CLI context was switched to another engine after the scan.
-        h.commands.outputs[infoArgs.joined(separator: " ")] = "engine-2 remote\n"
+        // Another engine now listens on the scanned endpoint.
+        h.commands.outputs[Self.infoArgs.joined(separator: " ")] = "engine-2 docker-desktop\n"
         let refused = await h.executor().execute(plan, confirmation: confirmation)
         guard case .skipped = refused.results.first?.status else {
             Issue.record("expected a skip")
@@ -188,10 +239,24 @@ struct TestEnvironment {
         }
         #expect(!h.commands.calls.contains { $0.contains("rm") })
 
-        h.commands.outputs[infoArgs.joined(separator: " ")] = "engine-1 orbstack\n"
+        h.commands.outputs[Self.infoArgs.joined(separator: " ")] = "engine-1 orbstack\n"
         let report = await h.executor().execute(plan, confirmation: confirmation)
         #expect(report.doneCount == 1)
-        #expect(h.commands.calls.last == ["/fake/bin/docker", "volume", "rm", "shop_db"])
+        #expect(h.commands.calls.last == ["/fake/bin/docker", "--host", Self.host, "volume", "rm", "shop_db"])
+    }
+
+    @Test func engineIsCheckedAgainBeforeEveryOperation() async throws {
+        let h = try TestEnvironment()
+        h.commands.outputs[Self.infoArgs.joined(separator: " ")] = "engine-1 orbstack"
+        // The engine changes while the first removal runs.
+        h.commands.afterCall = { argv in
+            if argv.contains("rm") { h.commands.outputs[Self.infoArgs.joined(separator: " ")] = "engine-2 docker-desktop" }
+        }
+        let plan = CleaningPlan.make(from: ["a", "b"].map { dockerItem(h, $0) })
+        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
+        #expect(report.doneCount == 1)
+        #expect(h.commands.calls.filter { $0.contains("rm") }.count == 1)
+        #expect(h.commands.calls.filter { $0.contains("info") }.count == 2)
     }
 
     @Test func goModulesAreKeptWhenGoUsesAnotherFolder() async throws {
@@ -216,21 +281,6 @@ struct TestEnvironment {
         #expect(h.commands.calls.last == ["/fake/bin/go", "clean", "-modcache"])
     }
 
-    @Test func oneEngineCheckServesTheWholePlan() async throws {
-        let h = try TestEnvironment()
-        let info = ["docker", "info", "--format", "{{.ID}} {{.Name}}"]
-        h.commands.outputs[info.dropFirst().joined(separator: " ")] = "engine-1 orbstack"
-        let items = ["a", "b", "c"].map { name -> ScanItem in
-            var item = h.item(name, paths: [], action: .command(argv: ["docker", "volume", "rm", name]))
-            item.preconditions = [CommandCheck(argv: info, expected: "engine-1 orbstack", purpose: .dockerEngine)]
-            return item
-        }
-        let plan = CleaningPlan.make(from: items)
-        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
-        #expect(report.doneCount == 3)
-        #expect(h.commands.calls.filter { $0.contains("info") }.count == 1)
-    }
-
     @Test func commandsOnFoldersRespectTheDenylist() async throws {
         let h = try TestEnvironment()
         let uvCache = try h.make(".cache/uv")
@@ -241,6 +291,24 @@ struct TestEnvironment {
         let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
         #expect(h.commands.calls == [["/fake/bin/uv", "cache", "clean", "--cache-dir", uvCache]])
         #expect(report.doneCount == 1)
+    }
+
+    @Test func folderCommandRefusesAFolderReplacedByALink() async throws {
+        // uv resolves the cache folder before cleaning it, so a link put in its place after the scan
+        // would make it clean the link's target.
+        let h = try TestEnvironment()
+        let target = try h.make("work/notes")
+        _ = try h.make(".cache")
+        let uvCache = Paths.join(h.home, ".cache/uv")
+        try FileManager.default.createSymbolicLink(atPath: uvCache, withDestinationPath: target)
+        let item = h.item("uv", paths: [uvCache], action: .command(argv: ["uv", "cache", "clean", "--cache-dir", uvCache]))
+        let plan = CleaningPlan.make(from: [item])
+        let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
+        #expect(h.commands.calls.isEmpty)
+        guard case .skipped = report.results.first?.status else {
+            Issue.record("expected a skip")
+            return
+        }
     }
 
     @Test func permanentNeedsExplicitConfirmation() async throws {
@@ -288,12 +356,13 @@ struct TestEnvironment {
 
     @Test func runsOnlyAllowListedCommands() async throws {
         let h = try TestEnvironment()
-        let ok = h.item("ok", paths: [], action: .command(argv: ["docker", "volume", "rm", "shop_db"]))
-        var bad = h.item("bad", paths: [], action: .command(argv: ["docker", "system", "prune", "-af"]))
+        let ok = h.item("ok", paths: [], action: .command(argv: ["docker", "--host", Self.host, "volume", "rm", "shop_db"]))
+        var bad = h.item("bad", paths: [], action: .command(argv: ["docker", "--host", Self.host, "system", "prune", "-af"]))
         bad.safety = .safe
-        let plan = CleaningPlan.make(from: [ok, bad])
+        let unpinned = h.item("unpinned", paths: [], action: .command(argv: ["docker", "volume", "rm", "shop_db"]))
+        let plan = CleaningPlan.make(from: [ok, bad, unpinned])
         let report = await h.executor().execute(plan, confirmation: CleaningConfirmation(planID: plan.id, permanentConfirmed: true))
-        #expect(h.commands.calls == [["/fake/bin/docker", "volume", "rm", "shop_db"]])
+        #expect(h.commands.calls == [["/fake/bin/docker", "--host", Self.host, "volume", "rm", "shop_db"]])
         #expect(report.doneCount == 1)
     }
 

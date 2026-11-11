@@ -5,8 +5,12 @@ import Foundation
 ///
 /// `package` access keeps it inside this package: the scanner reaches it only through `ReadOnlyCommand`,
 /// and the cleaner only for allow-listed commands. It runs whatever it is given and checks no policy.
+///
+/// The program starts in a process group of its own, so stopping it reaches every process it started,
+/// and helpers still running when it exits are ended before its result is reported.
 package enum ProcessRunner {
     package struct Output: Sendable {
+        /// Exit code, or the signal number when a signal ended the program.
         package var status: Int32
         package var stdout: Data
         package var stderr: Data
@@ -15,70 +19,97 @@ package enum ProcessRunner {
     }
 
     /// - Parameters:
-    ///   - timeout: after this many seconds the program gets SIGTERM, and SIGKILL a few seconds later.
+    ///   - timeout: after this many seconds the process group gets SIGTERM, and SIGKILL a few seconds later.
     ///   - outputLimit: bytes kept per stream; with `keepTail` the newest bytes are kept, otherwise the first.
     ///   - environment: variables set on top of `ExecutableLocator.environment`.
     package static func run(
         executable: String, arguments: [String], timeout: TimeInterval,
         outputLimit: Int = 64 << 20, keepTail: Bool = false, environment: [String: String] = [:]
     ) async throws -> Output {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.environment = ExecutableLocator.environment.merging(environment) { _, new in new }
-        process.standardInput = FileHandle.nullDevice
+        let outPipe = Pipe(), errPipe = Pipe()
         let stdout = BoundedBuffer(limit: outputLimit, keepTail: keepTail)
         let stderr = BoundedBuffer(limit: outputLimit, keepTail: keepTail)
-        let outPipe = Pipe(), errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
+        let env = ExecutableLocator.environment.merging(environment) { _, new in new }
+        let pid = try spawn(
+            executable, [executable] + arguments, env: env,
+            stdout: outPipe.fileHandleForWriting.fileDescriptor, stderr: errPipe.fileHandleForWriting.fileDescriptor
+        )
+        // The child has its own copies; keeping ours open would hide the end of the streams.
+        try? outPipe.fileHandleForWriting.close()
+        try? errPipe.fileHandleForWriting.close()
         stdout.attach(outPipe.fileHandleForReading)
         stderr.attach(errPipe.fileHandleForReading)
-        let stopper = Stopper(process)
+        let group = ProcessGroup(pid)
 
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Output, Error>) in
-                process.terminationHandler = { finished in
-                    stopper.cancel()
-                    // A child that inherited the pipes may keep them open; do not wait for it for long.
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Output, Never>) in
+                Thread.detachNewThread {
+                    let status = group.waitAndReap()
+                    // A helper that left the group (setsid) may still hold the pipes; do not wait for it for long.
                     stdout.finish(within: 1)
                     stderr.finish(within: 1)
                     continuation.resume(returning: Output(
-                        status: finished.terminationStatus, stdout: stdout.data, stderr: stderr.data,
-                        wasStopped: stopper.didStop
+                        status: status, stdout: stdout.data, stderr: stderr.data, wasStopped: group.didStop
                     ))
                 }
-                do {
-                    try process.run()
-                } catch {
-                    process.terminationHandler = nil
-                    stdout.finish(within: 0)
-                    stderr.finish(within: 0)
-                    continuation.resume(throwing: error)
-                    return
-                }
-                stopper.schedule(after: timeout)
+                group.schedule(after: timeout)
             }
         } onCancel: {
-            stopper.stop()
+            group.stop()
         }
+    }
+
+    private static func spawn(_ path: String, _ argv: [String], env: [String: String], stdout: Int32, stderr: Int32) throws -> pid_t {
+        var actions = posix_spawn_file_actions_t(nil as OpaquePointer?)
+        var attributes = posix_spawnattr_t(nil as OpaquePointer?)
+        posix_spawn_file_actions_init(&actions)
+        posix_spawnattr_init(&attributes)
+        defer {
+            posix_spawn_file_actions_destroy(&actions)
+            posix_spawnattr_destroy(&attributes)
+        }
+        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
+        posix_spawn_file_actions_adddup2(&actions, stdout, 1)
+        posix_spawn_file_actions_adddup2(&actions, stderr, 2)
+        // A new group led by the child; every other descriptor of this app is closed in it. Signal handling
+        // starts from the defaults, so an ignored or blocked SIGTERM in this process cannot make it unstoppable.
+        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
+        posix_spawnattr_setpgroup(&attributes, 0)
+        var all = sigset_t(), none = sigset_t()
+        sigfillset(&all)
+        sigemptyset(&none)
+        posix_spawnattr_setsigdefault(&attributes, &all)
+        posix_spawnattr_setsigmask(&attributes, &none)
+
+        let cArgs = argv.map { strdup($0) } + [nil]
+        let cEnv = env.map { strdup("\($0.key)=\($0.value)") } + [nil]
+        defer {
+            cArgs.forEach { free($0) }
+            cEnv.forEach { free($0) }
+        }
+        var pid: pid_t = 0
+        let result = posix_spawn(&pid, path, &actions, &attributes, cArgs, cEnv)
+        guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: result) ?? .EINVAL) }
+        return pid
     }
 }
 
-/// Stops a process once: SIGTERM, then SIGKILL if it is still running after a grace period.
-private final class Stopper: @unchecked Sendable {
-    private let process: Process
+/// The process group of one launched program. Signals go to the whole group, and only while its leader
+/// has not been reaped, so its id cannot have been reused by an unrelated process.
+private final class ProcessGroup: @unchecked Sendable {
+    private let pid: pid_t
     private let lock = NSLock()
     private var timer: DispatchWorkItem?
     private var requested = false
     private var stopped = false
+    private var reaped = false
 
-    init(_ process: Process) { self.process = process }
+    init(_ pid: pid_t) { self.pid = pid }
 
     /// True only when the program was actually signalled, not when it finished on its own.
     var didStop: Bool { lock.withLock { stopped } }
 
-    /// Called once the process runs; honours a cancellation that arrived before it started.
+    /// Called once the program runs; honours a cancellation that arrived before it.
     func schedule(after timeout: TimeInterval) {
         let item = DispatchWorkItem { [weak self] in self?.stop() }
         let alreadyRequested: Bool = lock.withLock {
@@ -88,21 +119,35 @@ private final class Stopper: @unchecked Sendable {
         if alreadyRequested { stop() } else { DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: item) }
     }
 
-    func cancel() { lock.withLock { timer?.cancel() } }
-
+    /// SIGTERM to the group, then SIGKILL to whatever is still in it after a grace period.
     func stop() {
-        let shouldSignal: Bool = lock.withLock {
+        let signalled: Bool = lock.withLock {
             requested = true
-            guard !stopped, process.isRunning else { return false }
+            guard !stopped, !reaped else { return false }
             stopped = true
+            killpg(pid, SIGTERM)
             return true
         }
-        guard shouldSignal else { return }
-        process.terminate()
-        let pid = process.processIdentifier
-        DispatchQueue.global().asyncAfter(deadline: .now() + 3) { [process] in
-            if process.isRunning { kill(pid, SIGKILL) }
+        guard signalled else { return }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3) { [self] in
+            lock.withLock { if !reaped { _ = killpg(pid, SIGKILL) } }
         }
+    }
+
+    /// Blocks until the leader exits, ends the helpers it left in the group, then reaps it.
+    func waitAndReap() -> Int32 {
+        var info = siginfo_t()
+        while waitid(P_PID, id_t(pid), &info, WEXITED | WNOWAIT) == -1 && errno == EINTR {}
+        var status: Int32 = 0
+        lock.withLock {
+            timer?.cancel()
+            // The exited leader still holds its id, so the group id is ours until the reap below.
+            _ = killpg(pid, SIGKILL)
+            while waitpid(pid, &status, 0) == -1 && errno == EINTR {}
+            reaped = true
+        }
+        let signal = status & 0x7f
+        return signal == 0 ? (status >> 8) & 0xff : signal
     }
 }
 

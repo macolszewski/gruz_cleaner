@@ -186,7 +186,8 @@ mdls -name kMDItemCFBundleIdentifier -r /Applications/Example.app
 - a `versions` rule has no `versionPattern`;
 - a `command` action does not match `CommandPolicy`;
 - a precondition command is not an allow-listed check;
-- an artifact sets `parentSiblingContainsAny` without `parentSiblingsAny`.
+- an artifact sets `parentSiblingContainsAny` without `parentSiblingsAny`;
+- an `insideStrong` entry is not also in `insideAny`.
 
 Unknown `category`, `safety`, `kind`, `childTitle` or action `type` values fail decoding. The test suite adds:
 
@@ -217,6 +218,8 @@ Artifacts are folders inside the user's project folders that a build or install 
 | `siblingsAny` | no | `[]` | At least one entry next to the folder must match one of these globs. |
 | `insideAny` | no | `[]` | At least one entry inside the folder must match one of these globs. |
 | `insideNone` | no | `[]` | No entry inside the folder may match one of these globs (source files that show it is not output). |
+| `insideStrong` | no | `[]` | Entries of `insideAny` that only one tool creates. When none is present, the folder matched on generic names alone (`lib`, `tmp`) and the item is shown as Caution with a note. |
+| `rejectGitTracked` | no | `false` | Skip the folder when Git tracks files inside it (`git ls-files`): build output is ignored, sources are committed. |
 | `parentName` | no | none | Required name of the parent folder. A hidden parent name (`.nx`, `.claude`) also makes the walk enter such folders. |
 | `parentSiblingsAny` | no | `[]` | At least one entry next to the parent folder must match one of these globs (`nx.json` next to `.nx`). |
 | `parentSiblingContainsAny` | no | `[]` | One of the files matched by `parentSiblingsAny` must contain one of these strings (read up to 1 MB). `artifact.dotnet-artifacts` requires `UseArtifactsOutput` or `ArtifactsPath` in `Directory.Build.props`. |
@@ -228,7 +231,7 @@ Artifacts are folders inside the user's project folders that a build or install 
 | `childrenAreItems` | no | `false` | The found folder is a container; each subfolder becomes an item (agent worktrees). |
 | `gitStatusCheck` | no | `false` | Run `git status --porcelain` on each item and show the result in its note. |
 
-The context conditions are what make a name match trustworthy. `bin` is a .NET build folder only next to a project file; elsewhere it may hold scripts. `build` is build output next to `pubspec.yaml`, `build.gradle` or `CMakeLists.txt`, but may be source code elsewhere, and even next to `pyproject.toml` it may be a Python package named `build`; that is why `artifact.flutter-build` also requires generated files inside (`insideAny`) and no source files (`insideNone`). Always add a sibling or inside condition unless the name is unambiguous (`__pycache__`, `.mypy_cache`). Generic names need the tool's own file as context: `test-results` counts only next to a `playwright.config.*`, and `cypress/videos` only when the project has a `cypress.config.*`.
+The context conditions are what make a name match trustworthy. `bin` is a .NET build folder only next to a project file; elsewhere it may hold scripts. `build` is build output next to `pubspec.yaml`, `build.gradle` or `CMakeLists.txt`, but may be source code elsewhere, and even next to `pyproject.toml` it may be a Python package named `build`; that is why `artifact.flutter-build` also requires generated files inside (`insideAny`) and no source files (`insideNone`), skips folders with files tracked by Git (`rejectGitTracked`), and marks a folder Caution when only generic names such as `lib` matched (`insideStrong`). Always add a sibling or inside condition unless the name is unambiguous (`__pycache__`, `.mypy_cache`). Generic names need the tool's own file as context: `test-results` counts only next to a `playwright.config.*`, and `cypress/videos` only when the project has a `cypress.config.*`.
 
 Never derive a location by running project code. GRUZ does not execute JavaScript configs, `noxfile.py` or MSBuild to learn where output goes; it reads plain files and recognizes the default layout.
 

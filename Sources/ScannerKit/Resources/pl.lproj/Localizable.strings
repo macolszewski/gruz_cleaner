@@ -127,3 +127,7 @@
 "A folder in the path is a symbolic link" = "Jeden z katalogów w ścieżce jest dowiązaniem symbolicznym";
 "Contains data that cannot be recreated: %@" = "Zawiera dane, których nie da się odtworzyć: %@";
 "Docker: could not identify the engine, so Docker items cannot be removed in this scan." = "Docker: nie udało się ustalić, z którym silnikiem łączy się CLI, więc w tym skanie elementów Dockera nie można usunąć.";
+"Cannot check whether it holds data that cannot be recreated: %@ is not readable" = "Nie da się sprawdzić, czy zawiera dane nie do odtworzenia: brak dostępu do %@";
+"Docker: could not read the current context. Is OrbStack running?" = "Docker: nie udało się odczytać bieżącego kontekstu. Czy OrbStack jest uruchomiony?";
+"Only generic folder names (such as lib or tmp) suggest that a build tool made this folder. Check its contents before removing it." = "Na to, że ten folder utworzyło narzędzie do budowania, wskazują tylko ogólne nazwy (np. lib albo tmp). Przed usunięciem sprawdź jego zawartość.";
+"Some folders could not be read, so data in them is missing from this scan: %@" = "Części folderów nie udało się odczytać, więc ich danych brakuje w tym skanie: %@";

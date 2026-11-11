@@ -80,6 +80,11 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
     public var insideAny: [String]
     /// No entry inside the directory may match (source files that show the folder is not build output).
     public var insideNone: [String]
+    /// Entries of `insideAny` that only one tool creates (`CMakeCache.txt`, `intermediates`). When none is
+    /// present, the folder matched on generic names alone (`lib`, `tmp`) and the item is Caution.
+    public var insideStrong: [String]
+    /// A folder holding files tracked by Git is source code, whatever its name and contents.
+    public var rejectGitTracked: Bool
     /// Required name of the parent directory.
     public var parentName: String?
     /// At least one sibling of the parent directory must match one of these globs (the project file
@@ -97,7 +102,7 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
     public var gitStatusCheck: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case id, dirNames, siblingsAny, insideAny, insideNone, parentName, parentSiblingsAny, parentSiblingContainsAny
+        case id, dirNames, siblingsAny, insideAny, insideNone, insideStrong, rejectGitTracked, parentName, parentSiblingsAny, parentSiblingContainsAny
         case title, description, regeneration, safety, action, childrenAreItems, gitStatusCheck
     }
 
@@ -108,6 +113,8 @@ public struct ArtifactDefinition: Codable, Sendable, Identifiable {
         siblingsAny = try c.decodeIfPresent([String].self, forKey: .siblingsAny) ?? []
         insideAny = try c.decodeIfPresent([String].self, forKey: .insideAny) ?? []
         insideNone = try c.decodeIfPresent([String].self, forKey: .insideNone) ?? []
+        insideStrong = try c.decodeIfPresent([String].self, forKey: .insideStrong) ?? []
+        rejectGitTracked = try c.decodeIfPresent(Bool.self, forKey: .rejectGitTracked) ?? false
         parentName = try c.decodeIfPresent(String.self, forKey: .parentName)
         parentSiblingsAny = try c.decodeIfPresent([String].self, forKey: .parentSiblingsAny) ?? []
         parentSiblingContainsAny = try c.decodeIfPresent([String].self, forKey: .parentSiblingContainsAny) ?? []
@@ -252,6 +259,9 @@ public struct RuleCatalog: Sendable {
             guard seen.insert(artifact.id).inserted else { throw LoadError.duplicateID(artifact.id) }
             if !artifact.parentSiblingContainsAny.isEmpty, artifact.parentSiblingsAny.isEmpty {
                 throw LoadError.invalid(artifact.id, "parentSiblingContainsAny needs parentSiblingsAny")
+            }
+            if let stray = artifact.insideStrong.first(where: { !artifact.insideAny.contains($0) }) {
+                throw LoadError.invalid(artifact.id, "insideStrong entry \(stray) is not in insideAny")
             }
             if case .command(let argv) = artifact.action, !CommandPolicy.isAllowedCleanCommand(argv) {
                 throw LoadError.invalid(artifact.id, "command not allow-listed: \(argv.joined(separator: " "))")

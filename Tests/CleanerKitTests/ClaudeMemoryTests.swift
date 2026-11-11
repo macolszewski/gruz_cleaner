@@ -150,7 +150,7 @@ actor MemoryRuntimeStub: ClaudeMemoryRuntime {
         #expect(result.backup == nil)
     }
 
-    @Test func activeWorkerAndQueueBlockDeletion() async throws {
+    @Test func activeWorkerBlocksDeletion() async throws {
         let fixture = try MemoryFixture()
         let preview = try fixture.preview()
         let runtime = MemoryRuntimeStub()
@@ -158,11 +158,19 @@ actor MemoryRuntimeStub: ClaudeMemoryRuntime {
         let cleaner = ClaudeMemoryCleaner(runtime: runtime, log: FakeLog(), backupRoot: fixture.backups)
         let result = await cleaner.execute(preview, confirmedID: preview.id, permanentConfirmed: true)
         #expect(!result.succeeded)
-        await runtime.setIdle(true)
-        try fixture.write("INSERT INTO pending_messages VALUES(1,1)")
-        let queued = await cleaner.execute(preview, confirmedID: preview.id, permanentConfirmed: true)
-        #expect(!queued.succeeded)
         #expect(try fixture.count("observations") == 4)
+    }
+
+    @Test func queueRowsLeftByAnEarlierVersionDoNotBlockAnIdleWorker() async throws {
+        // The worker keeps its queue in memory and reports it as idle; the table row is a leftover it never reads.
+        let fixture = try MemoryFixture()
+        try fixture.write("INSERT INTO pending_messages VALUES(1,1)")
+        let preview = try fixture.preview()
+        #expect(preview.pendingMessages == 1)
+        let cleaner = ClaudeMemoryCleaner(runtime: MemoryRuntimeStub(), log: FakeLog(), backupRoot: fixture.backups)
+        let result = await cleaner.execute(preview, confirmedID: preview.id, permanentConfirmed: true)
+        #expect(result.succeeded, "\(result.failure ?? "")")
+        #expect(try fixture.count("pending_messages") == 1)
     }
 
     @Test func successfulCleanPreservesUnselectedDataAndRebuildsFTS() async throws {

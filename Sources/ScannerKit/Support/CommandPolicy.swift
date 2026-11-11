@@ -8,11 +8,14 @@ public enum CommandPolicy {
         case operand
     }
 
+    private static let docker: [Token] = [.literal("docker"), .literal("--host"), .operand]
+
     private static let cleanPatterns: [[Token]] = [
-        [.literal("docker"), .literal("image"), .literal("rm"), .operand],
-        [.literal("docker"), .literal("volume"), .literal("rm"), .operand],
-        [.literal("docker"), .literal("container"), .literal("rm"), .operand],
-        [.literal("docker"), .literal("builder"), .literal("prune"), .literal("--force")],
+        // Docker commands name the engine endpoint read during the scan, never the CLI's current context.
+        docker + [.literal("image"), .literal("rm"), .operand],
+        docker + [.literal("volume"), .literal("rm"), .operand],
+        docker + [.literal("container"), .literal("rm"), .operand],
+        docker + [.literal("builder"), .literal("prune"), .literal("--force")],
         [.literal("xcrun"), .literal("simctl"), .literal("delete"), .operand],
         // The cache folder is passed explicitly, so the command cleans the folder that was measured.
         [.literal("uv"), .literal("cache"), .literal("clean"), .literal("--cache-dir"), .operand],
@@ -25,16 +28,19 @@ public enum CommandPolicy {
     ]
 
     private static let readOnlyPatterns: [[Token]] = [
-        [.literal("docker"), .literal("system"), .literal("df"), .literal("-v"), .literal("--format"), .literal("{{json .}}")],
-        [.literal("docker"), .literal("info"), .literal("--format"), .literal("{{.ID}} {{.Name}}")],
+        [.literal("docker"), .literal("context"), .literal("inspect"), .literal("--format"), .literal("{{.Endpoints.docker.Host}}")],
+        docker + [.literal("system"), .literal("df"), .literal("-v"), .literal("--format"), .literal("{{json .}}")],
+        docker + [.literal("info"), .literal("--format"), .literal("{{.ID}} {{.Name}}")],
         [.literal("xcrun"), .literal("simctl"), .literal("list"), .literal("devices"), .literal("--json")],
         [.literal("git")] + GitInspection.options.map { .literal($0) } + [.literal("-C"), .operand, .literal("status"), .literal("--porcelain")],
+        [.literal("git")] + GitInspection.options.map { .literal($0) } + [.literal("-C"), .operand, .literal("config"), .literal("--get-regexp"), .literal("^filter\\.")],
+        [.literal("git")] + GitInspection.options.map { .literal($0) } + [.literal("-C"), .operand, .literal("ls-files")],
     ]
 
     /// Read-only commands whose output binds a removal to what was scanned (see `CommandCheck`).
     private static let checkPatterns: [[Token]] = [
-        [.literal("docker"), .literal("info"), .literal("--format"), .literal("{{.ID}} {{.Name}}")],
-        [.literal("docker"), .literal("image"), .literal("inspect"), .literal("--format"), .literal("{{.Id}}"), .operand],
+        docker + [.literal("info"), .literal("--format"), .literal("{{.ID}} {{.Name}}")],
+        docker + [.literal("image"), .literal("inspect"), .literal("--format"), .literal("{{.Id}}"), .operand],
         [.literal("go"), .literal("env"), .literal("GOMODCACHE")],
     ]
 
@@ -62,4 +68,27 @@ public enum CommandPolicy {
 /// (an fsmonitor hook) or take optional locks while refreshing the index.
 public enum GitInspection {
     public static let options = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"]
+
+    /// Filter driver names from `git config --get-regexp '^filter\.'` (lines "filter.<name>.<key> <value>";
+    /// a name may contain dots).
+    public static func filterNames(fromConfig output: String) -> [String] {
+        let names = output.split(whereSeparator: \.isNewline).compactMap { line -> String? in
+            let key = line.prefix { !$0.isWhitespace }
+            guard key.hasPrefix("filter."), let lastDot = key.lastIndex(of: "."), lastDot > key.index(key.startIndex, offsetBy: 6) else { return nil }
+            return String(key[key.index(key.startIndex, offsetBy: 7)..<lastDot])
+        }
+        return Array(Set(names)).sorted()
+    }
+
+    /// Configuration passed through the environment (`GIT_CONFIG_COUNT`, Git 2.31+) that empties every
+    /// command of the named filters: Git runs no filter whose command is empty.
+    public static func environment(disablingFilters names: [String]) -> [String: String] {
+        let keys = names.flatMap { name in ["clean", "smudge", "process"].map { "filter.\(name).\($0)" } }
+        var env = ["GIT_CONFIG_COUNT": String(keys.count)]
+        for (index, key) in keys.enumerated() {
+            env["GIT_CONFIG_KEY_\(index)"] = key
+            env["GIT_CONFIG_VALUE_\(index)"] = ""
+        }
+        return keys.isEmpty ? [:] : env
+    }
 }

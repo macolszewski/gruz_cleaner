@@ -177,13 +177,8 @@ def rebuild(database, output, client_factory=None):
     print(json.dumps({"verified": True, "documents": len(expected_ids), "projects": len(watermarks)}), flush=True)
 
 
-def verify_index(database, output):
-    """Validate a completed staging index against current source content before recovery."""
-    import chromadb
-    from chromadb.config import Settings
-    output = Path(output)
-    if output.is_symlink() or not (output / "chroma.sqlite3").is_file() or not (output / "cleaner-watermarks.json").is_file():
-        raise ValueError("No completed staging index")
+def source_snapshot(database):
+    """Documents and watermarks the database holds now, read in one transaction."""
     expected = {}
     watermarks = {}
     with closing(sqlite3.connect(Path(database).resolve(strict=True).as_uri() + "?mode=ro", uri=True)) as db:
@@ -197,9 +192,25 @@ def verify_index(database, output):
                     if identifier in expected:
                         raise ValueError("Duplicate source document ID")
                     expected[identifier] = (document, metadata)
+    return expected, watermarks
+
+
+def verify_index(database, output, client_factory=None):
+    """Validate a completed staging index against current source content before recovery.
+
+    The database is read again after the comparison: a write that lands while the index is being
+    compared would otherwise leave an accepted index older than the database."""
+    output = Path(output)
+    if output.is_symlink() or not (output / "chroma.sqlite3").is_file() or not (output / "cleaner-watermarks.json").is_file():
+        raise ValueError("No completed staging index")
+    expected, watermarks = source_snapshot(database)
     if json.loads((output / "cleaner-watermarks.json").read_text()) != watermarks:
         raise ValueError("Staging watermarks no longer match the database")
-    client = chromadb.PersistentClient(path=str(output), settings=Settings(anonymized_telemetry=False))
+    if client_factory is None:
+        import chromadb
+        from chromadb.config import Settings
+        client_factory = lambda path: chromadb.PersistentClient(path=path, settings=Settings(anonymized_telemetry=False))
+    client = client_factory(str(output))
     collection = client.get_collection("cm__claude-mem")
     if collection.count() != len(expected):
         raise ValueError("Staging index is incomplete")
@@ -212,6 +223,8 @@ def verify_index(database, output):
             seen.add(identifier)
     if seen != set(expected):
         raise ValueError("Staging document IDs do not match")
+    if source_snapshot(database) != (expected, watermarks):
+        raise ValueError("The database changed during verification")
     print(json.dumps({"verified": True, "documents": len(expected)}), flush=True)
 
 
