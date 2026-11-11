@@ -21,7 +21,8 @@ public final class ClaudeMemoryReader {
         }
         sqlite3_busy_timeout(db, 3000)
         let tables = Set(try rows("SELECT name FROM sqlite_master WHERE type='table'").compactMap { $0["name"] })
-        guard Set(["observations", "session_summaries", "user_prompts", "sdk_sessions", "pending_messages"]).isSubset(of: tables) else {
+        // `pending_messages` is optional: from 13.28 the worker keeps its queue in memory.
+        guard Set(["observations", "session_summaries", "user_prompts", "sdk_sessions"]).isSubset(of: tables) else {
             throw ClaudeMemoryError.message(String(localized: "Unrecognized claude-mem database schema. Cleaning is blocked.", bundle: .scannerKit))
         }
     }
@@ -74,11 +75,9 @@ public final class ClaudeMemoryReader {
                     throw ClaudeMemoryError.message(String(localized: "A record has an invalid identifier or date.", bundle: .scannerKit))
                 }
                 if row["origin_device_id"] != nil { remoteCount += 1; continue }
-                let data = try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys])
                 records.append(ClaudeMemoryRecord(kind: kind, rowID: id, project: row["cleaner_project"] ?? "",
                                                  date: Date(timeIntervalSince1970: epoch / 1000),
-                                                 fingerprint: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(),
-                                                 isRemote: false))
+                                                 fingerprint: try Self.fingerprint(row), isRemote: false))
             }
         }
         var files: [ClaudeMemoryFile] = []
@@ -106,7 +105,8 @@ public final class ClaudeMemoryReader {
         }
         let projects = try rows("SELECT project FROM observations UNION SELECT project FROM session_summaries UNION SELECT project FROM sdk_sessions ORDER BY project")
             .compactMap { $0["project"] }
-        let pending = try rows("SELECT count(*) AS n FROM pending_messages").first?["n"].flatMap(Int64.init) ?? 0
+        let pending = tables.contains("pending_messages")
+            ? try rows("SELECT count(*) AS n FROM pending_messages").first?["n"].flatMap(Int64.init) ?? 0 : 0
         return ClaudeMemoryPreview(id: UUID(), location: location, filter: filter, records: records, files: files.sorted { $0.path < $1.path },
                                   projects: projects, databaseBytes: Self.diskBytes(location.database) + Self.diskBytes(URL(fileURLWithPath: location.database.path + "-wal")),
                                   indexBytes: Self.diskBytes(location.chroma), pendingMessages: pending,
@@ -119,8 +119,63 @@ public final class ClaudeMemoryReader {
         let join = record.kind == .prompts ? "LEFT JOIN sdk_sessions s ON s.id = t.session_db_id" : ""
         guard let row = try rows("SELECT t.*, \(project) AS cleaner_project FROM \(table) t \(join) WHERE t.id = ?",
                                  parameters: [String(record.rowID)]).first else { return false }
-        let data = try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys])
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == record.fingerprint
+        return try Self.fingerprint(row) == record.fingerprint
+    }
+
+    /// Columns claude-mem updates on its own (usage counters, reinforcement, sync bookkeeping). A change
+    /// there is not an edit of the memory, so it must not invalidate the preview.
+    static let bookkeepingColumns: Set<String> = ["relevance_count", "occurrence_count", "reinforcement_dates", "last_reinforced", "synced_at"]
+
+    static func fingerprint(_ row: [String: String]) throws -> String {
+        let content = row.filter { !bookkeepingColumns.contains($0.key) }
+        let data = try JSONSerialization.data(withJSONObject: content, options: [.sortedKeys])
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Full-text indexes over memory records: the ones whose content follows the record tables.
+    public static let rebuildableFTS: Set<String> = ["observations_fts", "session_summaries_fts", "user_prompts_fts"]
+
+    /// The FTS5 tables to rebuild after maintenance, read from the schema because they differ between
+    /// releases (`user_prompts_fts` only in 13.28, `tool_uses_fts` from 15.14). `tool_uses_fts` is built
+    /// incrementally by the worker and kept current by its delete trigger, so it is not rebuilt.
+    /// An FTS table over memory data that GRUZ does not know stops the maintenance.
+    public func fullTextIndexes() throws -> [String] {
+        var result: [String] = []
+        for (name, content) in try fts5Tables() {
+            if Self.rebuildableFTS.contains(name) {
+                result.append(name)
+            } else if name != "tool_uses_fts", let content, Self.memoryTables.contains(content) {
+                throw ClaudeMemoryError.message(String(localized: "Unrecognized full-text index \(name) in the claude-mem database. Cleaning is blocked.", bundle: .scannerKit))
+            }
+        }
+        return result.sorted()
+    }
+
+    static let memoryTables: Set<String> = ["observations", "session_summaries", "user_prompts", "tool_uses"]
+
+    /// Every FTS5 table with the table named by its `content=` option (quoted or bare), if any.
+    func fts5Tables() throws -> [(name: String, content: String?)] {
+        let pattern = try NSRegularExpression(pattern: #"content\s*=\s*['"`\[]?([A-Za-z0-9_]+)"#, options: [.caseInsensitive])
+        return try rows("SELECT name, sql FROM sqlite_master WHERE type='table' AND sql LIKE 'CREATE VIRTUAL TABLE%'").compactMap { row in
+            guard let name = row["name"], let sql = row["sql"], sql.range(of: "fts5", options: .caseInsensitive) != nil else { return nil }
+            let match = pattern.firstMatch(in: sql, range: NSRange(sql.startIndex..., in: sql))
+            let content = match.flatMap { Range($0.range(at: 1), in: sql) }.map { sql[$0].lowercased() }
+            return (name, content)
+        }
+    }
+
+    /// Direct deletion of tool history is safe only while nothing but claude-mem's own full-text index
+    /// depends on `tool_uses` (true from 13.28 to 15.x, where tool history is never synced), and that
+    /// index, when present, has the delete trigger that keeps it current.
+    public func checkToolHistoryStandalone() throws {
+        let triggers = try rows("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name='tool_uses'")
+        let foreign = triggers.filter { !($0["name"] ?? "").hasPrefix("tool_uses_fts_") }
+        let references = try rows("SELECT m.name AS name FROM sqlite_master m JOIN pragma_foreign_key_list(m.name) f WHERE m.type='table' AND f.\"table\"='tool_uses'")
+        let indexed = try fts5Tables().contains { $0.content == "tool_uses" }
+        let keptCurrent = triggers.contains { ($0["sql"] ?? "").range(of: #"AFTER\s+DELETE\s+ON\s+["`]?tool_uses\b"#, options: [.regularExpression, .caseInsensitive]) != nil && ($0["name"] ?? "").hasPrefix("tool_uses_fts_") }
+        guard foreign.isEmpty, references.isEmpty, !indexed || keptCurrent else {
+            throw ClaudeMemoryError.message(String(localized: "This claude-mem version links other data to the tool history, so GRUZ does not remove it directly.", bundle: .scannerKit))
+        }
     }
 
     public static func diskBytes(_ url: URL) -> Int64 {

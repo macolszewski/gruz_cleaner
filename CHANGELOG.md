@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- claude-mem maintenance supports every release from 13.28.0 to 15.x, not only 13.x. The Chroma
+  index is rebuilt in the document format of the installed worker, and the full-text indexes are read
+  from the database schema. Before anything is deleted, the newest documents of the current index are
+  compared with the helper's output, so a release that changes the format is refused.
+
+### Fixed
+
+- claude-mem: the default worker port is claude-mem's own (37700 plus the last two digits of the user
+  id), not 37777.
+- claude-mem: maintenance is refused when another component controls the worker (external
+  autostart, remote worker, server mode, shared work-view state, a host other than 127.0.0.1) or an
+  auto-update is in progress, and the stopped worker is checked again before every write.
+- claude-mem: counters the worker updates in the background no longer invalidate the preview, rows
+  without a project are no longer indexed, and empty metadata values match what claude-mem writes.
+- The indexing helper no longer leaves `cleaner-progress.json` in the installed index.
+
 ## [1.1.0]
 
 ### Added

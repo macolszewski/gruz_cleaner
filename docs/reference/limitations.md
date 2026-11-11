@@ -74,7 +74,7 @@ See [Rust and Cargo](../guide/rust.md#limitations) for the full list.
 
 ## claude-mem
 
-- Supports claude-mem worker 13.x from 13.28.0 on, with local Chroma and the default embedding model.
+- Supports claude-mem from 13.28.0 to 15.x (checked against every release up to 15.17.0), with local Chroma and the default embedding model, and only while claude-mem itself starts the worker on this computer.
 - Needs Bun and uv. The first run may download Python packages and the embedding model.
 - Removing memory does not reset the cmem.ai usage quota.
 - Backups contain the removed data and stay on disk until you delete them.

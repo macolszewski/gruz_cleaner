@@ -59,7 +59,7 @@
 "The worker rejected %@ /api/%@ (HTTP %lld). Check the state of claude-mem and do not force anything." = "Worker odrzucił %@ /api/%@ (HTTP %lld). Sprawdź stan claude-mem; niczego nie wymuszaj.";
 "Start claude-mem so GRUZ can confirm the database location and manage the worker safely." = "Uruchom claude-mem, aby GRUZ mógł potwierdzić lokalizację bazy i bezpiecznie zarządzać workerem.";
 "The worker does not serve this database or is still starting." = "Worker nie obsługuje wskazanej bazy albo jeszcze się uruchamia.";
-"GRUZ supports claude-mem 13.x from version 13.28.0. Found version %@." = "Obsługiwana jest linia claude-mem 13.x od 13.28.0. Wykryto %@.";
+"GRUZ supports claude-mem from version 13.28.0 to 15.x. Found version %@." = "GRUZ obsługuje claude-mem od wersji 13.28.0 do 15.x. Wykryto wersję %@.";
 "The worker start script is missing." = "Brak skryptu uruchomieniowego workera.";
 "claude-mem has active sessions or queued work. End the agent sessions that use memory, then try again." = "claude-mem ma aktywne sesje lub kolejkę. Zakończ sesje agentów korzystających z pamięci, a potem spróbuj ponownie.";
 "This record cannot be deleted through the worker." = "Tego rekordu nie można usunąć przez workera.";
@@ -85,3 +85,8 @@
 "Stopped because the operation log cannot be written: %@" = "Wstrzymano, bo nie da się zapisać dziennika operacji: %@";
 "The folder was replaced by a link or a file, or it no longer exists. Scan again." = "Folder został zastąpiony dowiązaniem lub plikiem albo już nie istnieje. Zeskanuj ponownie.";
 "This item comes from an older scan. Scan again." = "Ta pozycja pochodzi ze starszego skanu. Zeskanuj ponownie.";
+"Cannot read the claude-mem update state. Try again in a moment." = "Nie można odczytać stanu aktualizacji claude-mem. Spróbuj ponownie za chwilę.";
+"claude-mem is installing an update. Try again when it finishes." = "claude-mem instaluje aktualizację. Spróbuj ponownie, gdy się zakończy.";
+"The claude-mem version that was running is no longer installed. Start claude-mem yourself, for example by opening a new agent session." = "Wersja claude-mem, która działała wcześniej, nie jest już zainstalowana. Uruchom claude-mem samodzielnie, na przykład otwierając nową sesję agenta.";
+"This claude-mem version uses a Chroma version GRUZ cannot write yet. The index was not changed." = "Ta wersja claude-mem używa wersji Chromy, której GRUZ jeszcze nie obsługuje. Indeks nie został zmieniony.";
+"claude-mem %@ writes the Chroma index in a format GRUZ does not know. Nothing was changed. %@" = "claude-mem %@ zapisuje indeks Chroma w formacie, którego GRUZ nie zna. Niczego nie zmieniono. %@";

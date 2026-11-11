@@ -91,9 +91,14 @@ public actor ClaudeMemoryCleaner {
                 }
                 guard preview.count > 0 else { throw LocalizedMessage("Nothing to remove in this scope.") }
             }
+            // Schema checks run before anything changes, so an unknown layout refuses the whole operation
+            // instead of stopping it halfway, after records were deleted through the worker.
+            let schema = try ClaudeMemoryReader(location: location)
+            _ = try schema.fullTextIndexes()
+            if !rebuildOnly, preview.records.contains(where: { $0.kind == .toolUses }) { try schema.checkToolHistoryStandalone() }
             if location.chromaEnabled || FileManager.default.fileExists(atPath: location.chroma.path) {
                 await progress(String(localized: "Preparing the local indexing model (the first run may download dependencies)…", bundle: .cleanerKit))
-                try await runtime.prepareIndex(location: location)
+                try await runtime.prepareIndex(location: location, worker: identity)
             }
             if identity.running { try await runtime.checkIdle(location: location) }
             let backup = backupRoot.appendingPathComponent(UUID().uuidString)
@@ -138,6 +143,7 @@ public actor ClaudeMemoryCleaner {
                 guard remaining.records == localRows, remaining.files == preview.files else {
                     throw LocalizedMessage("Local files or the tool history changed. Preview again after the indexes are rebuilt.")
                 }
+                if !localRows.isEmpty { try ClaudeMemoryReader(location: location).checkToolHistoryStandalone() }
                 try ClaudeMemoryDatabase(url: location.database).removeLocalRecords(localRows)
                 report.removedRecords += localRows.count
                 for file in preview.files {
@@ -147,9 +153,7 @@ public actor ClaudeMemoryCleaner {
             }
             await progress(String(localized: "Rebuilding text indexes and compacting SQLite…", bundle: .cleanerKit))
             try await runtime.checkStopped(location: location)
-            let fts = try ClaudeMemoryReader(location: location)
-                .rows("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('observations_fts','session_summaries_fts','user_prompts_fts')")
-                .compactMap { $0["name"] }
+            let fts = try ClaudeMemoryReader(location: location).fullTextIndexes()
             try ClaudeMemoryDatabase(url: location.database).rebuildFTS(tables: fts)
             let integrity = try ClaudeMemoryReader(location: location).rows("PRAGMA integrity_check")
             guard integrity.count == 1, integrity.first?.values.first == "ok" else {
@@ -168,7 +172,7 @@ public actor ClaudeMemoryCleaner {
                     for candidate in candidates {
                         guard FileManager.default.fileExists(atPath: candidate.appendingPathComponent("cleaner-watermarks.json").path) else { continue }
                         await progress(String(localized: "Checking the index kept from the interrupted maintenance…", bundle: .cleanerKit))
-                        if (try? await runtime.verifyIndex(location: location, destination: candidate)) != nil {
+                        if (try? await runtime.verifyIndex(location: location, worker: identity, destination: candidate)) != nil {
                             reusable = candidate
                             break
                         }
@@ -177,13 +181,14 @@ public actor ClaudeMemoryCleaner {
                 let staging = reusable ?? location.root.appendingPathComponent(".cleaner-chroma-\(UUID().uuidString)")
                 try await runtime.checkStopped(location: location)
                 if reusable == nil {
-                    try await runtime.rebuildIndex(location: location, destination: staging, progress: progress)
+                    try await runtime.rebuildIndex(location: location, worker: identity, destination: staging, progress: progress)
                     try await runtime.checkStopped(location: location)
                     // The rebuild read one snapshot; the index is checked against the database as it is now, right
                     // before it is installed, and the helper refuses it when the database changes while it compares.
                     // A reused index was verified the same way just above.
-                    try await runtime.verifyIndex(location: location, destination: staging)
+                    try await runtime.verifyIndex(location: location, worker: identity, destination: staging)
                 }
+                try await runtime.checkStopped(location: location)
                 try installIndex(staging, location: location, backup: backup)
             }
             report.indexRebuilt = true

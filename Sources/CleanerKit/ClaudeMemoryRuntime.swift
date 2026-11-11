@@ -12,6 +12,33 @@ public struct ClaudeMemoryWorker: Codable, Sendable {
         self.version = version
         self.running = running
     }
+
+    /// The oldest release whose HTTP API, data layout and Chroma format GRUZ handles.
+    public static let minimumVersion = "13.28.0"
+    /// Releases checked against the claude-mem source: 13.28.0 to 15.17.0. Newer minor releases of
+    /// the same major line are accepted; the schema and index checks guard what may still change.
+    public static let newestSupportedMajor = 15
+
+    /// Numeric `major.minor.patch`, ignoring a pre-release or build suffix; nil for anything else.
+    static func components(_ version: String) -> [Int]? {
+        let core = version.split(whereSeparator: { $0 == "-" || $0 == "+" }).first.map(String.init) ?? ""
+        let parts = core.split(separator: ".", omittingEmptySubsequences: false).map { Int($0) }
+        guard parts.count == 3, parts.allSatisfy({ $0 != nil }) else { return nil }
+        return parts.compactMap { $0 }
+    }
+
+    public static func isSupported(_ version: String) -> Bool {
+        guard let parts = components(version), let minimum = components(minimumVersion) else { return false }
+        return parts.lexicographicallyPrecedes(minimum) == false && parts[0] <= newestSupportedMajor
+    }
+
+    /// The ChromaSync document format this release writes (`--layout` of the indexing helper).
+    public var indexLayout: String {
+        guard let parts = Self.components(version) else { return "13.34" }
+        if parts.lexicographicallyPrecedes([13, 29, 0]) { return "13.28" }
+        if parts.lexicographicallyPrecedes([13, 34, 0]) { return "13.29" }
+        return "13.34"
+    }
 }
 
 /// Everything ClaudeMemoryCleaner needs from claude-mem and the Chroma tooling; replaced by a stub in tests.
@@ -22,16 +49,18 @@ public protocol ClaudeMemoryRuntime: Sendable {
     /// Throws while agent sessions or queued work could write to the database.
     func checkIdle(location: ClaudeMemoryLocation) async throws
     /// Makes sure the indexing helper and its embedding model are available before anything changes.
-    func prepareIndex(location: ClaudeMemoryLocation) async throws
+    /// Also compares the newest documents of the current index with what the helper would write for them,
+    /// so a release that changed the document format is refused before anything is deleted.
+    func prepareIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker) async throws
     /// Deletes a synced record through the worker API, so claude-mem records the deletion for sync.
     func delete(_ record: ClaudeMemoryRecord, location: ClaudeMemoryLocation) async throws
     func stop(location: ClaudeMemoryLocation) async throws
     /// Throws unless the worker is down and no process has claude-mem files open.
     func checkStopped(location: ClaudeMemoryLocation) async throws
-    /// Builds a new Chroma index in `destination` from the current database.
-    func rebuildIndex(location: ClaudeMemoryLocation, destination: URL, progress: @escaping @Sendable (String) async -> Void) async throws
+    /// Builds a new Chroma index in `destination` from the current database, in the format `worker` writes.
+    func rebuildIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker, destination: URL, progress: @escaping @Sendable (String) async -> Void) async throws
     /// Throws unless the index in `destination` matches the current database exactly.
-    func verifyIndex(location: ClaudeMemoryLocation, destination: URL) async throws
+    func verifyIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker, destination: URL) async throws
     func start(_ worker: ClaudeMemoryWorker, location: ClaudeMemoryLocation) async throws
 }
 
@@ -60,6 +89,8 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
     }
 
     public func worker(location: ClaudeMemoryLocation) async throws -> ClaudeMemoryWorker {
+        if let reason = location.unsupportedSetup { throw LocalizedMessage(verbatim: reason) }
+        try checkNoUpdateInProgress(location: location)
         let health: [String: Any]
         do { health = try await request("health", location: location) }
         catch {
@@ -78,9 +109,8 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
               health["initialized"] as? Bool == true else {
             throw LocalizedMessage("The worker does not serve this database or is still starting.")
         }
-        // The HTTP API and the Chroma document layout were verified against this release line only.
-        guard version.hasPrefix("13."), !VersionCompare.isNewer("13.28.0", than: version) else {
-            throw LocalizedMessage("GRUZ supports claude-mem 13.x from version 13.28.0. Found version \(version).")
+        guard ClaudeMemoryWorker.isSupported(version) else {
+            throw LocalizedMessage("GRUZ supports claude-mem from version 13.28.0 to 15.x. Found version \(version).")
         }
         _ = try runtimeExecutable()
         guard workerPath.hasPrefix("/"), URL(fileURLWithPath: workerPath).lastPathComponent == "worker-service.cjs",
@@ -88,6 +118,17 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
             throw LocalizedMessage("The worker start script is missing.")
         }
         return ClaudeMemoryWorker(path: workerPath, version: version, running: true)
+    }
+
+    /// The auto-updater (15.14+) stops and restarts the worker while it installs a release.
+    private func checkNoUpdateInProgress(location: ClaudeMemoryLocation) throws {
+        guard let data = try? Data(contentsOf: location.autoUpdateState) else { return }
+        guard let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LocalizedMessage("Cannot read the claude-mem update state. Try again in a moment.")
+        }
+        if let attempt = state["inFlightAttempt"], !(attempt is NSNull) {
+            throw LocalizedMessage("claude-mem is installing an update. Try again when it finishes.")
+        }
     }
 
     public func checkIdle(location: ClaudeMemoryLocation) async throws {
@@ -118,6 +159,8 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
     }
 
     public func checkStopped(location: ClaudeMemoryLocation) async throws {
+        // A new agent session, the MCP server or the auto-updater can start the worker again at any time.
+        try checkNoUpdateInProgress(location: location)
         if (try? await request("health", location: location)) != nil {
             throw LocalizedMessage("The worker is running. Quit the claude-mem clients and try again.")
         }
@@ -145,16 +188,34 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
         return (uv, ["run", "--no-project", "--python", "3.13", "--with", "chromadb==1.5.9", "--with", "onnxruntime>=1.20", "--with", "protobuf<7", "python", helper.path])
     }
 
-    public func prepareIndex(location: ClaudeMemoryLocation) async throws {
-        guard location.chromaMode == "local", location.embeddingFunction == "default" else {
+    public func prepareIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker) async throws {
+        guard location.chromaMode == "local", ["", "default"].contains(location.embeddingFunction) else {
             throw LocalizedMessage("A full rebuild supports only a local Chroma with the default embedding model. A remote or custom index needs separate handling.")
         }
+        try checkChromaStore(location: location)
         let (tool, arguments) = try indexCommand()
         let result = try await ClaudeMemoryProcess.run(tool, arguments + ["--check"], timeout: 600)
         guard result.status == 0 else { throw LocalizedMessage("Could not prepare indexing: \(result.output)") }
+        guard FileManager.default.fileExists(atPath: location.chroma.appendingPathComponent("chroma.sqlite3").path) else { return }
+        let probe = try await ClaudeMemoryProcess.run(tool, arguments + ["--probe", "--layout", worker.indexLayout, "--database", location.database.path,
+                                                                          "--output", location.chroma.path], timeout: 600)
+        guard probe.status == 0 else {
+            throw LocalizedMessage("claude-mem \(worker.version) writes the Chroma index in a format GRUZ does not know. Nothing was changed. \(probe.output)")
+        }
     }
 
-    public func rebuildIndex(location: ClaudeMemoryLocation, destination: URL, progress: @escaping @Sendable (String) async -> Void) async throws {
+    /// claude-mem 13.29+ records which Chroma writer created the store and refuses a store from a newer
+    /// one. The helper writes with chromadb 1.5.9 (writer epoch 1, used through 15.17); any other record
+    /// means claude-mem moved on and an index from the helper could be unreadable to it.
+    private func checkChromaStore(location: ClaudeMemoryLocation) throws {
+        guard let data = try? Data(contentsOf: location.chroma.appendingPathComponent(".claude-mem-chroma-store.json")) else { return }
+        guard let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              record["writerEpoch"] as? Int == 1, record["chromadbVersion"] as? String == "1.5.9" else {
+            throw LocalizedMessage("This claude-mem version uses a Chroma version GRUZ cannot write yet. The index was not changed.")
+        }
+    }
+
+    public func rebuildIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker, destination: URL, progress: @escaping @Sendable (String) async -> Void) async throws {
         let (tool, arguments) = try indexCommand()
         let updates = Task {
             while !Task.isCancelled {
@@ -168,17 +229,21 @@ public struct LiveClaudeMemoryRuntime: ClaudeMemoryRuntime {
             }
         }
         defer { updates.cancel() }
-        let result = try await ClaudeMemoryProcess.run(tool, arguments + ["--database", location.database.path, "--output", destination.path], timeout: 3600)
+        let result = try await ClaudeMemoryProcess.run(tool, arguments + ["--layout", worker.indexLayout, "--database", location.database.path, "--output", destination.path], timeout: 3600)
         guard result.status == 0 else { throw LocalizedMessage("Rebuilding Chroma failed: \(result.output)") }
     }
 
-    public func verifyIndex(location: ClaudeMemoryLocation, destination: URL) async throws {
+    public func verifyIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker, destination: URL) async throws {
         let (tool, arguments) = try indexCommand()
-        let result = try await ClaudeMemoryProcess.run(tool, arguments + ["--verify", "--database", location.database.path, "--output", destination.path], timeout: 180)
+        let result = try await ClaudeMemoryProcess.run(tool, arguments + ["--verify", "--layout", worker.indexLayout, "--database", location.database.path, "--output", destination.path], timeout: 180)
         guard result.status == 0 else { throw LocalizedMessage("The index does not match the database: \(result.output)") }
     }
 
     public func start(_ worker: ClaudeMemoryWorker, location: ClaudeMemoryLocation) async throws {
+        // claude-mem 15.x prunes old plugin versions and can update itself, so the recorded script may be gone.
+        guard FileManager.default.fileExists(atPath: worker.path) else {
+            throw LocalizedMessage("The claude-mem version that was running is no longer installed. Start claude-mem yourself, for example by opening a new agent session.")
+        }
         let result = try await ClaudeMemoryProcess.run(try runtimeExecutable(), [worker.path, "start"], timeout: 90,
                                                        environment: ["CLAUDE_MEM_DATA_DIR": location.root.path, "CLAUDE_MEM_WORKER_PORT": String(location.port)])
         guard result.status == 0 else { throw LocalizedMessage("Could not start claude-mem: \(result.output)") }

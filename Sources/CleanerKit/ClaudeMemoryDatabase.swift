@@ -43,6 +43,7 @@ final class ClaudeMemoryDatabase {
     }
 
     func removeLocalRecords(_ records: [ClaudeMemoryRecord]) throws {
+        guard !records.isEmpty else { return }
         try execute("BEGIN IMMEDIATE")
         do {
             for row in records {
@@ -62,7 +63,7 @@ final class ClaudeMemoryDatabase {
 
     func rebuildFTS(tables: [String]) throws {
         // Table names are interpolated into SQL, so only the known FTS tables are accepted.
-        let allowed = Set(["observations_fts", "session_summaries_fts", "user_prompts_fts"])
+        let allowed = ClaudeMemoryReader.rebuildableFTS
         try execute("BEGIN IMMEDIATE")
         do {
             for table in tables {

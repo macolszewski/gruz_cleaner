@@ -108,19 +108,28 @@ public struct ClaudeMemoryLocation: Equatable, Sendable {
     public let chromaMode: String
     public let embeddingFunction: String
     public let cloudConfigured: Bool
+    /// Why GRUZ cannot manage this worker safely (it is controlled from outside or not reachable on
+    /// loopback), or nil. Maintenance is refused while it is set.
+    public let unsupportedSetup: String?
     public var database: URL { root.appendingPathComponent("claude-mem.db") }
     public var chroma: URL { root.appendingPathComponent("chroma") }
     public var syncState: URL { root.appendingPathComponent("chroma-sync-state.json") }
     public var maintenanceMarker: URL { root.appendingPathComponent(".cleaner-maintenance.json") }
+    /// Written by the claude-mem auto-updater (15.14+), which stops and restarts the worker.
+    public var autoUpdateState: URL { root.appendingPathComponent("auto-update-state.json") }
 
-    public init(root: URL, port: Int = 37777, chromaEnabled: Bool = true, chromaMode: String = "local",
-                embeddingFunction: String = "default", cloudConfigured: Bool = false) {
+    /// claude-mem's default port: 37700 plus the last two digits of the user id (all releases from 13.28).
+    public static var defaultPort: Int { 37700 + Int(getuid() % 100) }
+
+    public init(root: URL, port: Int = ClaudeMemoryLocation.defaultPort, chromaEnabled: Bool = true, chromaMode: String = "local",
+                embeddingFunction: String = "default", cloudConfigured: Bool = false, unsupportedSetup: String? = nil) {
         self.root = root.standardizedFileURL.resolvingSymlinksInPath()
         self.port = port
         self.chromaEnabled = chromaEnabled
         self.chromaMode = chromaMode
         self.embeddingFunction = embeddingFunction
         self.cloudConfigured = cloudConfigured
+        self.unsupportedSetup = unsupportedSetup
     }
 
     public static func discover(home: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -129,7 +138,9 @@ public struct ClaudeMemoryLocation: Equatable, Sendable {
             let file = root.appendingPathComponent("settings.json")
             guard FileManager.default.fileExists(atPath: file.path) else { return [:] }
             let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] ?? [:]
-            return raw["env"] as? [String: Any] ?? raw
+            // claude-mem reads the nested `env` object only when it holds claude-mem keys.
+            if let nested = raw["env"] as? [String: Any], nested.keys.contains(where: { $0.hasPrefix("CLAUDE_MEM_") }) { return nested }
+            return raw
         }
         func expanded(_ path: String) -> URL {
             URL(fileURLWithPath: path == "~" ? home.path : path.hasPrefix("~/") ? home.path + path.dropFirst() : path)
@@ -139,15 +150,46 @@ public struct ClaudeMemoryLocation: Equatable, Sendable {
         let path = environment["CLAUDE_MEM_DATA_DIR"] ?? defaults["CLAUDE_MEM_DATA_DIR"] as? String
         let root = path.flatMap { $0.isEmpty ? nil : expanded($0) } ?? fallback
         let config = try settings(root)
-        func value(_ key: String) -> String? { environment[key] ?? config[key].map { String(describing: $0) } }
-        let port = Int(value("CLAUDE_MEM_WORKER_PORT") ?? "37777") ?? 0
+        func value(_ key: String) -> String? { environment[key] ?? config[key].map(settingText) }
+        let configuredPort = value("CLAUDE_MEM_WORKER_PORT")?.trimmingCharacters(in: .whitespaces) ?? ""
+        let port = configuredPort.isEmpty ? defaultPort : Int(configuredPort) ?? 0
         guard (1...65535).contains(port) else { throw ClaudeMemoryError.message(String(localized: "Invalid claude-mem port.", bundle: .scannerKit)) }
         return Self(root: root, port: port,
                     chromaEnabled: value("CLAUDE_MEM_CHROMA_ENABLED") != "false",
                     chromaMode: value("CLAUDE_MEM_CHROMA_MODE") ?? "local",
                     embeddingFunction: value("CLAUDE_MEM_CHROMA_EMBEDDING_FUNCTION") ?? "default",
                     cloudConfigured: ["CLAUDE_MEM_CLOUD_SYNC_TOKEN", "CLAUDE_MEM_CLOUD_SYNC_USER_ID", "CLAUDE_MEM_CLOUD_SYNC_HUB_URL"]
-                        .allSatisfy { !(value($0) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+                        .allSatisfy { !(value($0) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
+                    unsupportedSetup: unsupportedSetup(value))
+    }
+
+    /// A settings value as claude-mem reads it (JavaScript `String()`): JSON `true` is "true", not "1".
+    static func settingText(_ value: Any) -> String {
+        if let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() { return number.boolValue ? "true" : "false" }
+        return String(describing: value)
+    }
+
+    /// Settings under which another component owns the worker, so stopping and restarting it from GRUZ
+    /// would race with that component or not reach the worker at all.
+    static func unsupportedSetup(_ value: (String) -> String?) -> String? {
+        func setting(_ key: String) -> String { (value(key) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        if setting("CLAUDE_MEM_WORKER_AUTOSTART") == "false" {
+            return String(localized: "The claude-mem worker is managed outside claude-mem (CLAUDE_MEM_WORKER_AUTOSTART=false), so GRUZ cannot stop and restart it safely.", bundle: .scannerKit)
+        }
+        if !setting("CLAUDE_MEM_WORKER_URL").isEmpty {
+            return String(localized: "claude-mem sends memory to a remote worker (CLAUDE_MEM_WORKER_URL). Maintain the data on that machine.", bundle: .scannerKit)
+        }
+        if ["server", "server-beta"].contains(setting("CLAUDE_MEM_RUNTIME")) {
+            return String(localized: "claude-mem runs in server mode (CLAUDE_MEM_RUNTIME), which keeps memory outside this database.", bundle: .scannerKit)
+        }
+        if setting("CLAUDE_MEM_WORK_VIEW_SHARED_STATE") == "true" {
+            return String(localized: "With CLAUDE_MEM_WORK_VIEW_SHARED_STATE=true another claude-mem process writes to the database while the worker is stopped.", bundle: .scannerKit)
+        }
+        // GRUZ talks to 127.0.0.1; a worker bound to ::1 (or to localhost resolved to ::1) would not answer there.
+        if !["", "127.0.0.1", "0.0.0.0"].contains(setting("CLAUDE_MEM_WORKER_HOST")) {
+            return String(localized: "The claude-mem worker does not listen on 127.0.0.1 (CLAUDE_MEM_WORKER_HOST), where GRUZ connects to it.", bundle: .scannerKit)
+        }
+        return nil
     }
 }
 

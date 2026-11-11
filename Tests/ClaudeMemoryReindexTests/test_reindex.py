@@ -93,6 +93,86 @@ class ReindexTests(unittest.TestCase):
         self.assertEqual(reindex.documents("observations", dict(id=1, created_at_epoch=1000, title="Title"))[0][0], "obs_1_title")
         self.assertEqual(reindex.documents("observations", dict(id=1, created_at_epoch=1000, title="Untitled")), [])
 
+    def test_layouts_follow_each_release_line(self):
+        # Expected values follow ChromaSync and normalizePlatformSource at v13.28.0, v13.29.0 and v13.34.0
+        # (unchanged through v15.17.0), written out by hand.
+        title_only = dict(id=1, created_at_epoch=1000, project="p", title="Title")
+        self.assertEqual(reindex.documents("observations", title_only, "13.28"), [])
+        self.assertEqual(reindex.documents("observations", title_only, "13.29")[0][0], "obs_1_title")
+        cases = [("pi-mono", "pi-mono", "pi"), ("Kimi CLI", "kimi-cli", "kimi"), ("agy", "agy", "antigravity-cli"),
+                 ("Claude Code", "claude", "claude"), ("transcript", "codex", "codex"), ("", "claude", "claude")]
+        for raw, old, new in cases:
+            row = dict(id=2, created_at_epoch=1000, project="p", narrative="n", platform_source=raw)
+            self.assertEqual(reindex.documents("observations", row, "13.28")[0][2]["platform_source"], old, raw)
+            self.assertEqual(reindex.documents("observations", row, "13.34")[0][2]["platform_source"], new, raw)
+        self.assertEqual(reindex.documents("observations", dict(row, platform_source="pi-mono"), "13.29")[0][2]["platform_source"], "pi-mono")
+
+    def test_text_and_metadata_cleanup_matches_add_documents(self):
+        row = dict(id=3, created_at_epoch=1000, project="p", memory_session_id=None, narrative="a\0b", merged_into_project="", files_read="[]")
+        doc = reindex.documents("observations", row)[0]
+        self.assertEqual(doc[1], "a�b")
+        self.assertNotIn("memory_session_id", doc[2])
+        self.assertNotIn("merged_into_project", doc[2])
+        self.assertEqual(reindex.documents("observations", row, "13.28")[0][1], "a\0b")
+        prompt = reindex.documents("prompts", dict(id=4, created_at_epoch=1000, project="p", prompt_text="t", platform_source="Pi-Mono", prompt_number=None))[0]
+        self.assertEqual(prompt[2]["platform_source"], "Pi-Mono")
+        self.assertNotIn("prompt_number", prompt[2])
+        self.assertEqual(reindex.file_list('[{"a": 1}]'), [{"a": 1}])
+        self.assertEqual(reindex._js_string({"a": 1}), "[object Object]")
+
+    def test_rows_without_project_are_not_indexed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture(root / "memory.db")
+            with closing(sqlite3.connect(root / "memory.db")) as db:
+                db.execute("INSERT INTO observations(id, project, narrative, created_at_epoch) VALUES(9, NULL, 'orphan', 1000)")
+                db.commit()
+            collection = Collection()
+            reindex.rebuild(root / "memory.db", root / "new", lambda _: Client(collection))
+            self.assertNotIn("obs_9_narrative", collection.docs)
+            self.assertNotIn("", json.loads((root / "new/cleaner-watermarks.json").read_text()))
+            self.assertFalse((root / "new/cleaner-progress.json").exists())
+
+    def write_store(self, path, docs):
+        """A minimal Chroma 1.x SQLite store holding `docs` in the claude-mem collection."""
+        with closing(sqlite3.connect(path)) as store:
+            store.executescript("""
+            CREATE TABLE collections(id TEXT PRIMARY KEY, name TEXT);
+            CREATE TABLE segments(id TEXT PRIMARY KEY, collection TEXT);
+            CREATE TABLE embeddings(id INTEGER PRIMARY KEY, segment_id TEXT, embedding_id TEXT, seq_id INTEGER);
+            CREATE TABLE embedding_metadata(id INTEGER, key TEXT, string_value TEXT, int_value INTEGER, float_value REAL, bool_value INTEGER);
+            INSERT INTO collections VALUES('c', 'cm__claude-mem');
+            INSERT INTO segments VALUES('s', 'c');
+            """)
+            for rowid, (identifier, text, metadata) in enumerate(docs, start=1):
+                store.execute("INSERT INTO embeddings VALUES(?, 's', ?, ?)", (rowid, identifier, rowid))
+                store.execute("INSERT INTO embedding_metadata(id, key, string_value) VALUES(?, 'chroma:document', ?)", (rowid, text))
+                for key, value in metadata.items():
+                    column = "int_value" if isinstance(value, int) else "string_value"
+                    store.execute(f"INSERT INTO embedding_metadata(id, key, {column}) VALUES(?, ?, ?)", (rowid, key, value))
+            store.commit()
+
+    def test_probe_accepts_the_known_format_and_refuses_a_changed_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture(root / "memory.db")
+            expected, _ = reindex.source_snapshot(root / "memory.db")
+            docs = [(i, text, meta) for i, (text, meta) in expected.items()]
+            (root / "same").mkdir()
+            self.write_store(root / "same/chroma.sqlite3", docs)
+            reindex.probe_format(root / "memory.db", root / "same")
+            (root / "renamed").mkdir()
+            self.write_store(root / "renamed/chroma.sqlite3", [("v2_" + i, text, meta) for i, text, meta in docs])
+            with self.assertRaises(ValueError):
+                reindex.probe_format(root / "memory.db", root / "renamed")
+            (root / "extra").mkdir()
+            self.write_store(root / "extra/chroma.sqlite3", [(i, text, dict(meta, schema=2)) for i, text, meta in docs])
+            with self.assertRaises(ValueError):
+                reindex.probe_format(root / "memory.db", root / "extra")
+            (root / "empty").mkdir()
+            self.write_store(root / "empty/chroma.sqlite3", [])
+            reindex.probe_format(root / "memory.db", root / "empty")
+
     def test_full_rebuild_includes_summary_and_prompt_only_projects(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

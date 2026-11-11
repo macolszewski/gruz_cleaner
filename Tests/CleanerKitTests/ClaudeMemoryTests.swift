@@ -70,7 +70,7 @@ actor MemoryRuntimeStub: ClaudeMemoryRuntime {
     func checkIdle(location: ClaudeMemoryLocation) async throws {
         if !idle { throw ClaudeMemoryError.message("active sessions") }
     }
-    func prepareIndex(location: ClaudeMemoryLocation) async throws { calls.append("prepare") }
+    func prepareIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker) async throws { calls.append("prepare") }
     func delete(_ record: ClaudeMemoryRecord, location: ClaudeMemoryLocation) async throws {
         deleteCalls += 1
         if failDeleteAt == deleteCalls { throw ClaudeMemoryError.message("cloud sync unavailable") }
@@ -81,14 +81,14 @@ actor MemoryRuntimeStub: ClaudeMemoryRuntime {
     func checkStopped(location: ClaudeMemoryLocation) async throws {
         if running { throw ClaudeMemoryError.message("worker running") }
     }
-    func rebuildIndex(location: ClaudeMemoryLocation, destination: URL, progress: @escaping @Sendable (String) async -> Void) async throws {
+    func rebuildIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker, destination: URL, progress: @escaping @Sendable (String) async -> Void) async throws {
         calls.append("rebuild")
         if failIndex { throw ClaudeMemoryError.message("embedding failed") }
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         try Data("{}".utf8).write(to: destination.appendingPathComponent("cleaner-watermarks.json"))
         try Data().write(to: destination.appendingPathComponent("chroma.sqlite3"))
     }
-    func verifyIndex(location: ClaudeMemoryLocation, destination: URL) async throws { calls.append("verify") }
+    func verifyIndex(location: ClaudeMemoryLocation, worker: ClaudeMemoryWorker, destination: URL) async throws { calls.append("verify") }
     func start(_ worker: ClaudeMemoryWorker, location: ClaudeMemoryLocation) async throws { calls.append("start"); running = true }
 }
 
@@ -267,5 +267,123 @@ actor MemoryRuntimeStub: ClaudeMemoryRuntime {
         #expect(result.root.path == data.path)
         #expect(result.port == 39999)
         #expect(!result.chromaEnabled)
+    }
+
+    @Test func everyReleaseFrom13_28To15IsAccepted() {
+        for version in ["13.28.0", "13.41.0", "14.0.1", "15.12.1", "15.17.0", "15.20.3", "15.2.0-beta.1"] {
+            #expect(ClaudeMemoryWorker.isSupported(version), "\(version)")
+        }
+        for version in ["13.27.1", "12.4.3", "16.0.0", "development", "15.1", ""] {
+            #expect(!ClaudeMemoryWorker.isSupported(version), "\(version)")
+        }
+        func layout(_ version: String) -> String { ClaudeMemoryWorker(path: "/w", version: version, running: true).indexLayout }
+        #expect(layout("13.28.0") == "13.28")
+        #expect(layout("13.29.0") == "13.29")
+        #expect(layout("13.33.0") == "13.29")
+        #expect(layout("13.34.0") == "13.34")
+        #expect(layout("15.17.0") == "13.34")
+    }
+
+    @Test func defaultPortAndSettingsShapeFollowClaudeMem() throws {
+        let fixture = try MemoryFixture()
+        let home = fixture.root.appendingPathComponent("home")
+        let data = home.appendingPathComponent(".claude-mem")
+        try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
+        // A nested `env` without claude-mem keys is not the settings object.
+        try Data(#"{"env":{"OTHER":"1"},"CLAUDE_MEM_CHROMA_ENABLED":"false"}"#.utf8).write(to: data.appendingPathComponent("settings.json"))
+        let result = try ClaudeMemoryLocation.discover(home: home, environment: [:])
+        #expect(result.port == 37700 + Int(getuid() % 100))
+        #expect(!result.chromaEnabled)
+        #expect(result.unsupportedSetup == nil)
+        #expect(try ClaudeMemoryLocation.discover(home: home, environment: ["CLAUDE_MEM_WORKER_PORT": "38000"]).port == 38000)
+    }
+
+    @Test func externallyManagedWorkersAreRefused() async throws {
+        let fixture = try MemoryFixture()
+        let home = fixture.root.appendingPathComponent("home")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".claude-mem"), withIntermediateDirectories: true)
+        for environment in [["CLAUDE_MEM_WORKER_AUTOSTART": "false"], ["CLAUDE_MEM_WORKER_URL": "http://10.0.0.2:37701"],
+                            ["CLAUDE_MEM_RUNTIME": "server"], ["CLAUDE_MEM_WORK_VIEW_SHARED_STATE": "true"],
+                            ["CLAUDE_MEM_WORKER_HOST": "192.168.1.5"]] {
+            let location = try ClaudeMemoryLocation.discover(home: home, environment: environment)
+            #expect(location.unsupportedSetup != nil, "\(environment)")
+            await #expect(throws: (any Error).self) { try await LiveClaudeMemoryRuntime().worker(location: location) }
+        }
+        for environment in [["CLAUDE_MEM_RUNTIME": "worker", "CLAUDE_MEM_WORKER_HOST": "127.0.0.1"], ["CLAUDE_MEM_WORKER_HOST": "0.0.0.0"]] {
+            #expect(try ClaudeMemoryLocation.discover(home: home, environment: environment).unsupportedSetup == nil)
+        }
+    }
+
+    @Test func schemaWithoutQueueTableIsReadable() throws {
+        let fixture = try MemoryFixture()
+        try fixture.write("DROP TABLE pending_messages")
+        let preview = try fixture.preview()
+        #expect(preview.pendingMessages == 0)
+        #expect(preview.records.count == 4)
+    }
+
+    @Test func counterUpdatesByTheWorkerDoNotInvalidateThePreview() async throws {
+        let fixture = try MemoryFixture()
+        try fixture.write("ALTER TABLE observations ADD COLUMN relevance_count INTEGER DEFAULT 0")
+        let preview = try fixture.preview()
+        try fixture.write("UPDATE observations SET relevance_count = relevance_count + 1")
+        let record = try #require(preview.records.first { $0.kind == .observations })
+        #expect(try ClaudeMemoryReader(location: fixture.location).matches(record))
+        try fixture.write("UPDATE observations SET narrative = 'edited' WHERE id = \(record.rowID)")
+        #expect(try !ClaudeMemoryReader(location: fixture.location).matches(record))
+    }
+
+    @Test func fullTextIndexesAreReadFromTheSchema() throws {
+        let fixture = try MemoryFixture()
+        try fixture.write("""
+            CREATE VIRTUAL TABLE user_prompts_fts USING fts5(prompt_text, content='user_prompts', content_rowid='id');
+            CREATE VIRTUAL TABLE tool_uses_fts USING fts5(tool_input, content='tool_uses', content_rowid='id');
+            """)
+        #expect(try ClaudeMemoryReader(location: fixture.location).fullTextIndexes() == ["observations_fts", "user_prompts_fts"])
+        try fixture.write("CREATE VIRTUAL TABLE observations_search USING fts5(title, content = 'observations', content_rowid='id')")
+        #expect(throws: (any Error).self) { try ClaudeMemoryReader(location: fixture.location).fullTextIndexes() }
+    }
+
+    @Test func toolHistoryWithDependentDataIsNotRemovedDirectly() throws {
+        let fixture = try MemoryFixture()
+        try ClaudeMemoryReader(location: fixture.location).checkToolHistoryStandalone()
+        // claude-mem's own index with its delete trigger is fine.
+        try fixture.write("""
+            CREATE VIRTUAL TABLE tool_uses_fts USING fts5(project, content='tool_uses', content_rowid='id');
+            INSERT INTO tool_uses_fts(tool_uses_fts) VALUES('rebuild');
+            """)
+        #expect(throws: (any Error).self) { try ClaudeMemoryReader(location: fixture.location).checkToolHistoryStandalone() }
+        try fixture.write("CREATE TRIGGER tool_uses_fts_ad AFTER DELETE ON tool_uses BEGIN INSERT INTO tool_uses_fts(tool_uses_fts, rowid, project) VALUES('delete', old.id, old.project); END")
+        try ClaudeMemoryReader(location: fixture.location).checkToolHistoryStandalone()
+        try fixture.write("CREATE TABLE tool_links(id INTEGER PRIMARY KEY, tool_use_id INTEGER REFERENCES tool_uses(id))")
+        #expect(throws: (any Error).self) { try ClaudeMemoryReader(location: fixture.location).checkToolHistoryStandalone() }
+    }
+
+    @Test func unknownSchemaIsRefusedBeforeAnythingIsDeleted() async throws {
+        let fixture = try MemoryFixture()
+        try fixture.write("CREATE VIRTUAL TABLE observations_search USING fts5(title, content=observations, content_rowid=id)")
+        let runtime = MemoryRuntimeStub()
+        let cleaner = ClaudeMemoryCleaner(runtime: runtime, log: FakeLog(), backupRoot: fixture.backups)
+        let preview = try fixture.preview()
+        let result = await cleaner.execute(preview, confirmedID: preview.id, permanentConfirmed: true)
+        #expect(!result.succeeded)
+        #expect(result.removedRecords == 0)
+        #expect(await !runtime.calls.contains(where: { $0.hasPrefix("delete:") || $0 == "stop" }))
+        #expect(await runtime.running)
+        #expect(try fixture.count("observations") == 4)
+    }
+
+    @Test func booleanSettingsAreReadLikeClaudeMem() throws {
+        let fixture = try MemoryFixture()
+        let home = fixture.root.appendingPathComponent("home")
+        let data = home.appendingPathComponent(".claude-mem")
+        try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
+        try Data(#"{"CLAUDE_MEM_WORKER_AUTOSTART":false,"CLAUDE_MEM_CHROMA_ENABLED":false}"#.utf8).write(to: data.appendingPathComponent("settings.json"))
+        let location = try ClaudeMemoryLocation.discover(home: home, environment: [:])
+        #expect(location.unsupportedSetup != nil)
+        #expect(!location.chromaEnabled)
+        for host in ["::1", "localhost"] {
+            #expect(try ClaudeMemoryLocation.discover(home: home, environment: ["CLAUDE_MEM_WORKER_AUTOSTART": "true", "CLAUDE_MEM_WORKER_HOST": host]).unsupportedSetup != nil, "\(host)")
+        }
     }
 }

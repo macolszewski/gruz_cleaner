@@ -131,3 +131,10 @@
 "Docker: could not read the current context. Is OrbStack running?" = "Docker: nie udało się odczytać bieżącego kontekstu. Czy OrbStack jest uruchomiony?";
 "Only generic folder names (such as lib or tmp) suggest that a build tool made this folder. Check its contents before removing it." = "Na to, że ten folder utworzyło narzędzie do budowania, wskazują tylko ogólne nazwy (np. lib albo tmp). Przed usunięciem sprawdź jego zawartość.";
 "Some folders could not be read, so data in them is missing from this scan: %@" = "Części folderów nie udało się odczytać, więc ich danych brakuje w tym skanie: %@";
+"The claude-mem worker is managed outside claude-mem (CLAUDE_MEM_WORKER_AUTOSTART=false), so GRUZ cannot stop and restart it safely." = "Worker claude-mem jest zarządzany spoza claude-mem (CLAUDE_MEM_WORKER_AUTOSTART=false), więc GRUZ nie może go bezpiecznie zatrzymać i uruchomić ponownie.";
+"claude-mem sends memory to a remote worker (CLAUDE_MEM_WORKER_URL). Maintain the data on that machine." = "claude-mem wysyła pamięć do zdalnego workera (CLAUDE_MEM_WORKER_URL). Porządkuj dane na tamtym komputerze.";
+"claude-mem runs in server mode (CLAUDE_MEM_RUNTIME), which keeps memory outside this database." = "claude-mem działa w trybie serwera (CLAUDE_MEM_RUNTIME), który trzyma pamięć poza tą bazą.";
+"With CLAUDE_MEM_WORK_VIEW_SHARED_STATE=true another claude-mem process writes to the database while the worker is stopped." = "Przy CLAUDE_MEM_WORK_VIEW_SHARED_STATE=true inny proces claude-mem zapisuje do bazy, także gdy worker jest zatrzymany.";
+"The claude-mem worker does not listen on 127.0.0.1 (CLAUDE_MEM_WORKER_HOST), where GRUZ connects to it." = "Worker claude-mem nie nasłuchuje na 127.0.0.1 (CLAUDE_MEM_WORKER_HOST), a tam łączy się GRUZ.";
+"Unrecognized full-text index %@ in the claude-mem database. Cleaning is blocked." = "Nierozpoznany indeks pełnotekstowy %@ w bazie claude-mem. Czyszczenie jest zablokowane.";
+"This claude-mem version links other data to the tool history, so GRUZ does not remove it directly." = "Ta wersja claude-mem wiąże z historią narzędzi inne dane, więc GRUZ nie usuwa jej bezpośrednio.";
