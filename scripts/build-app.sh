@@ -3,13 +3,13 @@
 #
 # Environment:
 #   CONFIGURATION  release (default, build/GRUZ.app) or debug (build/debug/GRUZ.app, enables screenshot scenarios)
-#   VERSION        version written to Info.plist (default: 1.2.0)
+#   VERSION        version written to Info.plist (default: 1.3.0)
 #   BUNDLE_ID      bundle identifier (default: io.github.macolszewski.GRUZ)
 #   SIGN_IDENTITY  code signing identity, name or SHA-1 (default: first "Apple Development" identity, else ad-hoc)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-1.2.0}"
+VERSION="${VERSION:-1.3.0}"
 BUNDLE_ID="${BUNDLE_ID:-io.github.macolszewski.GRUZ}"
 CONFIGURATION="${CONFIGURATION:-release}"
 if [ "$CONFIGURATION" = release ]; then APP="build/GRUZ.app"; else APP="build/$CONFIGURATION/GRUZ.app"; fi
